@@ -1,0 +1,282 @@
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/movie.dart';
+import '../../domain/entities/episode.dart';
+import '../../core/theme/app_colors.dart';
+import '../bloc/detail/detail_cubit.dart';
+import '../../domain/repositories/movie_source.dart';
+import '../../di/injection.dart';
+import 'player_screen.dart';
+
+class DetailScreen extends StatefulWidget {
+  final Movie movie;
+
+  const DetailScreen({super.key, required this.movie});
+
+  @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => getIt<DetailCubit>()..loadDetail(widget.movie.id),
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: BlocBuilder<DetailCubit, DetailState>(
+          builder: (context, state) {
+            if (state is DetailLoading || state is DetailInitial) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (state is DetailError) {
+              return Center(child: Text(state.message, style: const TextStyle(color: Colors.white)));
+            } else if (state is DetailLoaded) {
+              final detail = state.detail;
+              return Stack(
+                children: [
+                  // Background Poster with Fade
+                  if (detail.thumbnail != null)
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: 0.3,
+                        child: CachedNetworkImage(
+                          imageUrl: detail.thumbnail!,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            AppColors.background,
+                            AppColors.background.withValues(alpha: 0.8),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.3, 0.6, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Content
+                  Positioned.fill(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(left: 58.0, top: 48.0, right: 48.0, bottom: 48.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Back Button
+                          Focus(
+                            autofocus: true,
+                            child: Builder(
+                              builder: (context) {
+                                final isFocused = Focus.of(context).hasFocus;
+                                return GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isFocused ? Colors.white24 : Colors.black45,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isFocused ? AppColors.focusBorder : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                                  ),
+                                );
+                              }
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            (detail.type ?? 'MOVIE').toUpperCase(),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          detail.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: 600,
+                          child: Text(
+                            detail.description ?? '',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        
+                        // Play Button
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            if (detail.episodes.isNotEmpty) {
+                              _playEpisode(context, widget.movie.id, detail.episodes.first.id);
+                            }
+                          },
+                          icon: const Icon(Icons.play_arrow, size: 28),
+                          label: const Text('Play Movie', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 48),
+                        
+                        // Episodes (if any)
+                        if (detail.episodes.isNotEmpty) ...[
+                          const Text(
+                            'Episodes',
+                            style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 120,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: detail.episodes.length,
+                              itemBuilder: (context, index) {
+                                final ep = detail.episodes[index];
+                                return _buildEpisodeCard(context, widget.movie.id, ep);
+                              },
+                            ),
+                          ),
+                        ]
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _playEpisode(BuildContext context, int movieId, int episodeId) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final source = getIt<MovieSource>();
+      final streamInfo = await source.getStreamInfo(movieId, episodeId);
+      
+      if (!context.mounted) return;
+      
+      Navigator.pop(context); // hide loading
+      if (streamInfo != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PlayerScreen(streamInfo: streamInfo)),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load stream info')),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      
+      Navigator.pop(context);
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMsg)),
+      );
+    }
+  }
+
+  Widget _buildEpisodeCard(BuildContext context, int movieId, Episode ep) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16.0),
+      child: Builder(
+        builder: (context) {
+          bool isFocused = false;
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return Focus(
+                onFocusChange: (focused) => setState(() => isFocused = focused),
+                child: GestureDetector(
+                  onTap: () {
+                    _playEpisode(context, movieId, ep.id);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 200,
+                    decoration: BoxDecoration(
+                      color: isFocused ? AppColors.surfaceVariant : AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isFocused ? AppColors.focusBorder : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Episode ${ep.number.toInt()}',
+                            style: TextStyle(
+                              color: isFocused ? Colors.white : Colors.white70,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (ep.hasSub) ...[
+                            const SizedBox(height: 8),
+                            const Text(
+                              'SUB',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ]
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+          );
+        }
+      ),
+    );
+  }
+}
