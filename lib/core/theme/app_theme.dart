@@ -13,6 +13,12 @@ class AppTheme {
         surface: AppColors.surface,
         surfaceContainerHighest: AppColors.surfaceVariant,
       ),
+      focusColor: AppColors.primary,
+      hoverColor: AppColors.primary.withValues(alpha: 0.5),
+      listTileTheme: const ListTileThemeData(
+        selectedColor: Colors.white,
+        selectedTileColor: AppColors.primary,
+      ),
       textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
     );
   }

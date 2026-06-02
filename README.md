@@ -51,6 +51,3 @@ Cine Stream is a premium, open-source movie and TV show streaming application bu
 - Use **Up/Down/Left/Right (D-pad)** to navigate through movie cards and UI elements.
 - Press **Select (OK/Enter)** to open a movie, play a video, or toggle a filter.
 - Use the **Back** button to close the virtual keyboard or exit a screen.
-
-## 📝 License
-This project is for educational and personal use. 

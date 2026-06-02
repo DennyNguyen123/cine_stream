@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/filter.dart';
 import '../../domain/entities/movie.dart';
@@ -17,10 +18,34 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   bool _showFilters = false; // Hide filters by default to save space
 
   @override
+  void initState() {
+    super.initState();
+    _searchFocusNode.onKeyEvent = (node, event) {
+      if (event is KeyDownEvent) {
+        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+          FocusScope.of(context).focusInDirection(TraversalDirection.down);
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          FocusScope.of(context).focusInDirection(TraversalDirection.right);
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+          FocusScope.of(context).focusInDirection(TraversalDirection.left);
+          return KeyEventResult.handled;
+        }
+      }
+      return KeyEventResult.ignored;
+    };
+  }
+
+  @override
   void dispose() {
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -61,18 +86,60 @@ class _SearchScreenState extends State<SearchScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          IconButton(
-                            autofocus: true,
-                            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                            padding: const EdgeInsets.all(12),
-                            onPressed: () => Navigator.pop(context),
+                          Builder(
+                            builder: (context) {
+                              bool isFocused = false;
+                              return StatefulBuilder(
+                                builder: (context, setState) {
+                                  return Focus(
+                                    onFocusChange: (focused) => setState(() => isFocused = focused),
+                                    onKeyEvent: (node, event) {
+                                      if (event is KeyDownEvent &&
+                                          (event.logicalKey == LogicalKeyboardKey.select ||
+                                           event.logicalKey == LogicalKeyboardKey.enter)) {
+                                        Navigator.pop(context);
+                                        return KeyEventResult.handled;
+                                      }
+                                      return KeyEventResult.ignored;
+                                    },
+                                    child: GestureDetector(
+                                      onTap: () => Navigator.pop(context),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        transform: Matrix4.diagonal3Values(isFocused ? 1.1 : 1.0, isFocused ? 1.1 : 1.0, 1.0),
+                                        transformAlignment: Alignment.center,
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: isFocused ? AppColors.primary : Colors.transparent,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isFocused ? Colors.white : Colors.transparent,
+                                            width: 2,
+                                          ),
+                                          boxShadow: isFocused ? [
+                                            BoxShadow(
+                                              color: AppColors.primary.withValues(alpha: 0.6),
+                                              blurRadius: 15,
+                                              spreadRadius: 2,
+                                            )
+                                          ] : [],
+                                        ),
+                                        child: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: SizedBox(
                               height: 56,
                               child: TextField(
+                                focusNode: _searchFocusNode,
                                 controller: _searchController,
+                                autofocus: true,
                                 style: const TextStyle(color: Colors.white, fontSize: 18),
                                 textAlignVertical: TextAlignVertical.center,
                                 decoration: InputDecoration(
@@ -98,14 +165,52 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          IconButton(
-                            icon: Icon(_showFilters ? Icons.filter_alt_off : Icons.filter_alt, color: Colors.white, size: 28),
-                            padding: const EdgeInsets.all(12),
-                            tooltip: 'Toggle Filters',
-                            onPressed: () {
-                              setState(() {
-                                _showFilters = !_showFilters;
-                              });
+                          Builder(
+                            builder: (context) {
+                              bool isFocused = false;
+                              return StatefulBuilder(
+                                builder: (context, setStateFocus) {
+                                  return Focus(
+                                    onFocusChange: (focused) => setStateFocus(() => isFocused = focused),
+                                    onKeyEvent: (node, event) {
+                                      if (event is KeyDownEvent &&
+                                          (event.logicalKey == LogicalKeyboardKey.select ||
+                                           event.logicalKey == LogicalKeyboardKey.enter)) {
+                                        setState(() => _showFilters = !_showFilters);
+                                        return KeyEventResult.handled;
+                                      }
+                                      return KeyEventResult.ignored;
+                                    },
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() => _showFilters = !_showFilters);
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        transform: Matrix4.diagonal3Values(isFocused ? 1.1 : 1.0, isFocused ? 1.1 : 1.0, 1.0),
+                                        transformAlignment: Alignment.center,
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: isFocused ? AppColors.primary : Colors.transparent,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isFocused ? Colors.white : Colors.transparent,
+                                            width: 2,
+                                          ),
+                                          boxShadow: isFocused ? [
+                                            BoxShadow(
+                                              color: AppColors.primary.withValues(alpha: 0.6),
+                                              blurRadius: 15,
+                                              spreadRadius: 2,
+                                            )
+                                          ] : [],
+                                        ),
+                                        child: Icon(_showFilters ? Icons.filter_alt_off : Icons.filter_alt, color: Colors.white, size: 28),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
                             },
                           ),
                         ],
@@ -140,6 +245,15 @@ class _SearchScreenState extends State<SearchScreen> {
                                         builder: (context, setState) {
                                           return Focus(
                                             onFocusChange: (focused) => setState(() => isFocused = focused),
+                                            onKeyEvent: (node, event) {
+                                              if (event is KeyDownEvent &&
+                                                  (event.logicalKey == LogicalKeyboardKey.select ||
+                                                   event.logicalKey == LogicalKeyboardKey.enter)) {
+                                                context.read<SearchCubit>().updateFilter(field.key, option.value);
+                                                return KeyEventResult.handled;
+                                              }
+                                              return KeyEventResult.ignored;
+                                            },
                                             child: GestureDetector(
                                               onTap: () {
                                                 context.read<SearchCubit>().updateFilter(field.key, option.value);
@@ -149,19 +263,19 @@ class _SearchScreenState extends State<SearchScreen> {
                                                 curve: Curves.easeOutCubic,
                                                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                                                 decoration: BoxDecoration(
-                                                  color: isSelected 
-                                                      ? Colors.white 
-                                                      : (isFocused ? AppColors.surfaceVariant : AppColors.surface),
+                                                  color: isFocused 
+                                                      ? AppColors.primary 
+                                                      : (isSelected ? Colors.white : AppColors.surface),
                                                   borderRadius: BorderRadius.circular(24), // pill shape
                                                   border: Border.all(
                                                     color: isFocused ? Colors.white : Colors.transparent,
                                                     width: 2, // Stable layout bounds
                                                   ),
-                                                  boxShadow: isFocused && !isSelected ? [
+                                                  boxShadow: isFocused ? [
                                                     BoxShadow(
-                                                      color: Colors.white.withValues(alpha: 0.15),
-                                                      blurRadius: 8,
-                                                      spreadRadius: 1,
+                                                      color: AppColors.primary.withValues(alpha: 0.6),
+                                                      blurRadius: 10,
+                                                      spreadRadius: 2,
                                                     )
                                                   ] : [],
                                                 ),
@@ -220,7 +334,9 @@ class _SearchScreenState extends State<SearchScreen> {
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             return MovieCard(
+                              key: ValueKey('search_${movies[index].id}'),
                               movie: movies[index],
+                              autoFocus: index == 0,
                               onFocused: () {
                                 // Trigger loadMore when focusing on one of the last 10 items
                                 if (index >= movies.length - 10) {

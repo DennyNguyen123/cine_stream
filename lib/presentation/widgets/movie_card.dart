@@ -3,17 +3,20 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../domain/entities/movie.dart';
 import '../../../core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
+import 'marquee_text.dart';
 
 class MovieCard extends StatefulWidget {
   final Movie movie;
   final VoidCallback onFocused;
   final VoidCallback onClick;
+  final bool autoFocus;
 
   const MovieCard({
     super.key,
     required this.movie,
     required this.onFocused,
     required this.onClick,
+    this.autoFocus = false,
   });
 
   @override
@@ -26,6 +29,7 @@ class _MovieCardState extends State<MovieCard> {
   @override
   Widget build(BuildContext context) {
     return Focus(
+      autofocus: widget.autoFocus,
       onFocusChange: (focused) {
         setState(() {
           _isFocused = focused;
@@ -47,7 +51,7 @@ class _MovieCardState extends State<MovieCard> {
       child: GestureDetector(
         onTap: widget.onClick,
         child: AnimatedScale(
-          scale: _isFocused ? 1.05 : 1.0,
+          scale: _isFocused ? 1.08 : 1.0,
           duration: const Duration(milliseconds: 200),
           child: Container(
             width: 140,
@@ -55,13 +59,13 @@ class _MovieCardState extends State<MovieCard> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: _isFocused ? AppColors.focusBorder : Colors.transparent,
-                width: 2,
+                color: _isFocused ? Colors.white : Colors.transparent,
+                width: 3,
               ),
               boxShadow: _isFocused ? [
                 BoxShadow(
-                  color: AppColors.focusBorder.withValues(alpha:0.5),
-                  blurRadius: 10,
+                  color: AppColors.primary.withValues(alpha:0.6),
+                  blurRadius: 15,
                   spreadRadius: 2,
                 )
               ] : [],
@@ -128,15 +132,14 @@ class _MovieCardState extends State<MovieCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.movie.title,
+                        MarqueeText(
+                          text: widget.movie.title,
+                          isFocused: _isFocused,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Row(
