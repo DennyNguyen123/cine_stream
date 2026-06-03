@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -17,14 +18,15 @@ import '../../domain/repositories/movie_source.dart';
 import '../../di/injection.dart';
 import '../widgets/player_settings_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../domain/repositories/source_manager.dart';
 
 class PlayerScreen extends StatefulWidget {
   final StreamInfo streamInfo;
   final String title;
-  final int movieId;
+  final String movieId;
   final String movieTitle;
   final String? thumbnail;
-  final int episodeId;
+  final String episodeId;
   final double episodeNumber;
   final int startPositionMs;
   final List<Episode> allEpisodes;
@@ -80,12 +82,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.streamInfo.videoUrl),
-      httpHeaders: {
-        'Referer': 'https://kisskh.co/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
+      print('[PlayerScreen] Initializing with videoUrl: ${widget.streamInfo.videoUrl}');
+      print('[PlayerScreen] Initializing with headers: ${widget.streamInfo.headers}');
+      
+      // DIAGNOSTIC TEST: Let's see if Dart http gets 404 or 200
+      () async {
+        try {
+          final uri = Uri.parse(widget.streamInfo.videoUrl);
+          final request = await HttpClient().getUrl(uri);
+          if (widget.streamInfo.headers != null) {
+            widget.streamInfo.headers!.forEach((key, value) {
+              request.headers.set(key, value);
+            });
+          }
+          final response = await request.close();
+          print('[PlayerScreen] DIAGNOSTIC HTTP TEST: ${response.statusCode}');
+        } catch (e) {
+          print('[PlayerScreen] DIAGNOSTIC HTTP TEST FAILED: $e');
+        }
+      }();
+
+      _controller = VideoPlayerController.networkUrl(
+        Uri.parse(widget.streamInfo.videoUrl),
+        formatHint: widget.streamInfo.videoUrl.contains('.mp4') ? VideoFormat.other : VideoFormat.hls,
+        httpHeaders: widget.streamInfo.headers ?? {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
     )..initialize().then((_) {
         setState(() {
           _duration = _controller.value.duration;
@@ -114,19 +136,41 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
     
     if (widget.streamInfo.subtitles.isNotEmpty) {
-      final defaultSub = widget.streamInfo.subtitles.firstWhere(
-        (s) => s.label.toLowerCase().contains('english'),
-        orElse: () => widget.streamInfo.subtitles.first,
-      );
-      _fetchSubtitles(defaultSub, true);
-      
-      try {
-        final vnSub = widget.streamInfo.subtitles.firstWhere(
-          (s) => s.label.toLowerCase().contains('viet') || s.label.toLowerCase().contains('việt'),
-        );
-        _fetchSubtitles(vnSub, false);
-      } catch (e) {
-        debugPrint('Auto-fetch vietnamese subtitle error: $e');
+      final prefs = getIt<SharedPreferences>();
+      final prefTop = prefs.getString('pref_sub_top') ?? 'english';
+      final prefBottom = prefs.getString('pref_sub_bottom') ?? 'viet';
+
+      if (prefTop != 'off') {
+        try {
+          final topSub = widget.streamInfo.subtitles.firstWhere(
+            (s) => s.label.toLowerCase().contains(prefTop.toLowerCase()),
+            orElse: () => widget.streamInfo.subtitles.first,
+          );
+          _fetchSubtitles(topSub, true);
+        } catch (e) {
+          debugPrint('Auto-fetch top subtitle error: $e');
+        }
+      }
+
+      if (prefBottom != 'off') {
+        try {
+          final bottomSub = widget.streamInfo.subtitles.firstWhere(
+            (s) => s.label.toLowerCase().contains(prefBottom.toLowerCase()),
+            orElse: () {
+               if (prefBottom.contains('translate_vi')) {
+                  return const SubtitleTrack(id: -1, label: 'Vietnamese (Translate)', src: 'translate_vi');
+               }
+               throw Exception('Not found');
+            }
+          );
+          if (bottomSub.src == 'translate_vi') {
+             _translateSubtitles(bottomSub, false);
+          } else {
+             _fetchSubtitles(bottomSub, false);
+          }
+        } catch (e) {
+          debugPrint('Auto-fetch bottom subtitle error: $e');
+        }
       }
     }
   }
@@ -334,6 +378,55 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  void _changeServer(String serverId) async {
+    setState(() {
+      _isChangingEpisode = true; // Use same flag to prevent auto-next
+      _showControls = false;
+    });
+    
+    _controller.pause();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final source = getIt<MovieSource>();
+      final streamInfo = await source.getStreamInfo(widget.movieId, widget.episodeId, serverId: serverId);
+      
+      if (!mounted) return;
+      
+      Navigator.pop(context); // hide loading
+      
+      if (streamInfo != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => PlayerScreen(
+            streamInfo: streamInfo, 
+            title: widget.title,
+            movieId: widget.movieId,
+            movieTitle: widget.movieTitle,
+            thumbnail: widget.thumbnail,
+            episodeId: widget.episodeId,
+            episodeNumber: widget.episodeNumber,
+            startPositionMs: _position.inMilliseconds,
+            allEpisodes: widget.allEpisodes,
+          )),
+        );
+      } else {
+        setState(() => _isChangingEpisode = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not load server')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      setState(() => _isChangingEpisode = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
   void _startControlsTimer() {
     _hideControlsTimer?.cancel();
     _hideControlsTimer = Timer(const Duration(seconds: 5), () {
@@ -367,7 +460,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       positionMs: _position.inMilliseconds,
       durationMs: _duration.inMilliseconds,
       timestamp: DateTime.now().millisecondsSinceEpoch,
-      sourceId: 'kisskh',
+      sourceId: getIt<SourceManager>().activeSourceId,
     ));
   }
 
@@ -634,6 +727,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           builder: (context) => _buildEpisodesDialog(context),
                         );
                       },
+                      onServerToggle: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => _buildServerDialog(context),
+                        );
+                      },
                       onBack: () {
                         _handleBackPress();
                       },
@@ -719,9 +818,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       if (isTop) {
                         _selectedSub = null;
                         _primaryCues = [];
+                        getIt<SharedPreferences>().setString('pref_sub_top', 'off');
                       } else {
                         _selectedSecondarySub = null;
                         _secondaryCues = [];
+                        getIt<SharedPreferences>().setString('pref_sub_bottom', 'off');
                       }
                     });
                     Navigator.pop(context);
@@ -733,6 +834,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
               return ListTile(
                 title: Text(sub.label, style: const TextStyle(color: Colors.white)),
                 onTap: () {
+                  final subLabel = sub.src == 'translate_vi' ? 'translate_vi' : sub.label.toLowerCase();
+                  getIt<SharedPreferences>().setString(isTop ? 'pref_sub_top' : 'pref_sub_bottom', subLabel);
+                  
                   if (sub.src == 'translate_vi') {
                     _translateSubtitles(sub, isTop);
                   } else {
@@ -786,6 +890,56 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     },
                   );
                 },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServerDialog(BuildContext context) {
+    final servers = widget.streamInfo.servers;
+    if (servers.isEmpty) {
+       return const Dialog(
+         backgroundColor: AppColors.surface,
+         child: Padding(
+           padding: EdgeInsets.all(24.0),
+           child: Text('No other servers available', style: TextStyle(color: Colors.white)),
+         ),
+       );
+    }
+    
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      child: Container(
+        width: 350,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Select Server', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: servers.map((server) {
+                    final isCurrent = server.id == widget.streamInfo.currentServerId;
+                    return ListTile(
+                      title: Text(server.name, style: TextStyle(color: isCurrent ? AppColors.primary : Colors.white)),
+                      trailing: isCurrent ? const Icon(Icons.check, color: AppColors.primary) : null,
+                      onTap: () {
+                        Navigator.pop(context);
+                        if (!isCurrent) {
+                           _changeServer(server.id);
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ],

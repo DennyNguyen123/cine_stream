@@ -11,6 +11,8 @@ import '../bloc/detail/detail_cubit.dart';
 import '../../domain/repositories/movie_source.dart';
 import '../../di/injection.dart';
 import 'player_screen.dart';
+import 'webview_player_screen.dart';
+import '../../domain/repositories/source_manager.dart';
 
 class DetailScreen extends StatefulWidget {
   final Movie movie;
@@ -83,9 +85,15 @@ class _DetailScreenState extends State<DetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Back Button
+                            // Back button
                             Focus(
-                              autofocus: true,
+                              onKeyEvent: (node, event) {
+                                if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                                  Navigator.pop(context);
+                                  return KeyEventResult.handled;
+                                }
+                                return KeyEventResult.ignored;
+                              },
                               child: Builder(
                                 builder: (context) {
                                   final isFocused = Focus.of(context).hasFocus;
@@ -217,7 +225,11 @@ class _DetailScreenState extends State<DetailScreen> {
                             Builder(
                               builder: (context) {
                                 final sortedEpisodes = detail.episodes.toList()
-                                  ..sort((a, b) => a.number.compareTo(b.number));
+                                  ..sort((a, b) {
+                                    int sComp = a.season.compareTo(b.season);
+                                    if (sComp != 0) return sComp;
+                                    return a.number.compareTo(b.number);
+                                  });
                                 return SizedBox(
                                   height: 120,
                                   child: ListView.builder(
@@ -249,10 +261,15 @@ class _DetailScreenState extends State<DetailScreen> {
 
   void _handlePlayNow(BuildContext context, MovieDetail detail) {
     if (!mounted) return;
-    final ep = detail.episodes.reduce((curr, next) => curr.number < next.number ? curr : next);
-    final title = '${detail.title} - Tập ${ep.number.toInt()}';
+    final ep = detail.episodes.reduce((curr, next) {
+      if (curr.season < next.season) return curr;
+      if (curr.season > next.season) return next;
+      return curr.number < next.number ? curr : next;
+    });
+    final title = ep.title ?? '${detail.title} - Tập ${ep.number.toInt()}';
     // Check history for this movie
-    getIt<HistoryRepository>().getHistoryForMovie(widget.movie.id, 'kisskh').then((history) {
+    final sourceId = getIt<SourceManager>().activeSourceId;
+    getIt<HistoryRepository>().getHistoryForMovie(widget.movie.id, sourceId).then((history) {
       if (history != null) {
         if (!context.mounted) return;
         // Resume history
@@ -283,8 +300,8 @@ class _DetailScreenState extends State<DetailScreen> {
 
   void _playEpisode({
     required BuildContext context, 
-    required int movieId, 
-    required int episodeId, 
+    required String movieId, 
+    required String episodeId, 
     required String title,
     required double episodeNumber,
     required List<Episode> allEpisodes,
@@ -350,7 +367,7 @@ class _DetailScreenState extends State<DetailScreen> {
                   if (event is KeyDownEvent &&
                       (event.logicalKey == LogicalKeyboardKey.select ||
                        event.logicalKey == LogicalKeyboardKey.enter)) {
-                    final title = '${widget.movie.title} - Tập ${ep.number.toInt()}';
+                    final title = ep.title ?? '${widget.movie.title} - Tập ${ep.number.toInt()}';
                     _playEpisode(
                       context: context, 
                       movieId: widget.movie.id, 
@@ -365,7 +382,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 },
                 child: GestureDetector(
                   onTap: () {
-                    final title = '${widget.movie.title} - Tập ${ep.number.toInt()}';
+                    final title = ep.title ?? '${widget.movie.title} - Tập ${ep.number.toInt()}';
                     _playEpisode(
                       context: context, 
                       movieId: widget.movie.id, 
@@ -379,7 +396,7 @@ class _DetailScreenState extends State<DetailScreen> {
                     duration: const Duration(milliseconds: 200),
                     transform: Matrix4.diagonal3Values(isFocused ? 1.05 : 1.0, isFocused ? 1.05 : 1.0, 1.0),
                     transformAlignment: Alignment.center,
-                    width: 200,
+                    width: ep.title != null ? 300 : 200,
                     decoration: BoxDecoration(
                       color: isFocused ? AppColors.primary : AppColors.surface,
                       borderRadius: BorderRadius.circular(8),
@@ -400,10 +417,13 @@ class _DetailScreenState extends State<DetailScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Episode ${ep.number.toInt()}',
+                            ep.title ?? 'Episode ${ep.number.toInt()}',
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: isFocused ? Colors.white : Colors.white70,
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

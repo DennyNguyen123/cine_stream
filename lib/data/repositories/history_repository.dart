@@ -5,9 +5,9 @@ import '../../domain/entities/history_item.dart';
 abstract class HistoryRepository {
   Future<List<HistoryItem>> getHistory();
   Future<void> saveHistory(HistoryItem item);
-  Future<void> removeHistory(int movieId, String sourceId);
+  Future<void> removeHistory(String movieId, String sourceId);
   Future<void> clearHistory();
-  Future<HistoryItem?> getHistoryForMovie(int movieId, String sourceId);
+  Future<HistoryItem?> getHistoryForMovie(String movieId, String sourceId);
 }
 
 class HistoryRepositoryImpl implements HistoryRepository {
@@ -52,7 +52,7 @@ class HistoryRepositoryImpl implements HistoryRepository {
   }
 
   @override
-  Future<void> removeHistory(int movieId, String sourceId) async {
+  Future<void> removeHistory(String movieId, String sourceId) async {
     final list = await getHistory();
     list.removeWhere((e) => e.movieId == movieId && e.sourceId == sourceId);
     
@@ -66,7 +66,7 @@ class HistoryRepositoryImpl implements HistoryRepository {
   }
 
   @override
-  Future<HistoryItem?> getHistoryForMovie(int movieId, String sourceId) async {
+  Future<HistoryItem?> getHistoryForMovie(String movieId, String sourceId) async {
     final list = await getHistory();
     try {
       return list.firstWhere((e) => e.movieId == movieId && e.sourceId == sourceId);

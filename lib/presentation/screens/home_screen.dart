@@ -8,6 +8,7 @@ import '../../domain/entities/history_item.dart';
 import '../bloc/history/history_cubit.dart';
 import '../bloc/home/home_cubit.dart';
 import '../../di/injection.dart';
+import '../../domain/repositories/source_manager.dart';
 import '../../core/theme/app_colors.dart';
 import 'detail_screen.dart';
 import 'search_screen.dart';
@@ -54,12 +55,71 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Search Button at the top right
+                    // Search Button and Source Selection at the top right
                     Padding(
-                      padding: const EdgeInsets.only(top: 24.0, right: 48.0),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Builder(
+                      padding: const EdgeInsets.only(top: 24.0, right: 48.0, left: 48.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Source Selection Button
+                          Builder(
+                            builder: (context) {
+                              bool isFocused = false;
+                              final sourceManager = getIt<SourceManager>();
+                              return StatefulBuilder(
+                                builder: (context, setState) {
+                                  return Focus(
+                                    onFocusChange: (focused) => setState(() => isFocused = focused),
+                                    onKeyEvent: (node, event) {
+                                      if (event is KeyDownEvent &&
+                                          (event.logicalKey == LogicalKeyboardKey.select ||
+                                           event.logicalKey == LogicalKeyboardKey.enter)) {
+                                        _showSourceSelectionDialog(context);
+                                        return KeyEventResult.handled;
+                                      }
+                                      return KeyEventResult.ignored;
+                                    },
+                                    child: GestureDetector(
+                                      onTap: () => _showSourceSelectionDialog(context),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        transform: Matrix4.diagonal3Values(isFocused ? 1.05 : 1.0, isFocused ? 1.05 : 1.0, 1.0),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: isFocused ? AppColors.primary : Colors.black45,
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: isFocused ? Colors.white : Colors.transparent,
+                                            width: 2,
+                                          ),
+                                          boxShadow: isFocused ? [
+                                            BoxShadow(
+                                              color: AppColors.primary.withValues(alpha: 0.6),
+                                              blurRadius: 10,
+                                              spreadRadius: 2,
+                                            )
+                                          ] : [],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.source, color: Colors.white, size: 20),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              sourceManager.activeSource.sourceName,
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              );
+                            }
+                          ),
+                          // Search Button
+                          Builder(
                           builder: (context) {
                             bool isFocused = false;
                             return StatefulBuilder(
@@ -108,21 +168,27 @@ class _HomeScreenState extends State<HomeScreen> {
                                   child: const Icon(Icons.search, color: Colors.white, size: 28),
                                 ),
                               ),
-                            );
+                                );
                               }
                             );
                           }
                         ),
-                      ),
+                      ],
                     ),
+                  ),
                     
                     BlocBuilder<HistoryCubit, HistoryState>(
                       builder: (context, historyState) {
-                        if (historyState is HistoryLoaded && historyState.items.isNotEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 24.0),
-                            child: _buildHistoryRow(context, historyState.items),
-                          );
+                        if (historyState is HistoryLoaded) {
+                          final activeSourceId = getIt<SourceManager>().activeSourceId;
+                          final filteredItems = historyState.items.where((i) => i.sourceId == activeSourceId).toList();
+                          
+                          if (filteredItems.isNotEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 24.0),
+                              child: _buildHistoryRow(context, filteredItems),
+                            );
+                          }
                         }
                         return const Padding(
                           padding: EdgeInsets.all(58.0),
@@ -181,6 +247,49 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showSourceSelectionDialog(BuildContext context) {
+    final sourceManager = getIt<SourceManager>();
+    final sources = sourceManager.getAvailableSources();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Chọn Nguồn Phim', style: TextStyle(color: Colors.white)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: sources.length,
+            itemBuilder: (dialogCtx, index) {
+              final source = sources[index];
+              final isSelected = sourceManager.activeSourceId == source['id'];
+              return ListTile(
+                title: Text(source['name'] ?? '', style: const TextStyle(color: Colors.white)),
+                trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+                tileColor: isSelected ? Colors.white12 : Colors.transparent,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  if (!isSelected) {
+                    await sourceManager.setActiveSource(source['id']!);
+                    // Reload Data
+                    if (mounted) {
+                      context.read<HomeCubit>().loadData();
+                      context.read<HistoryCubit>().loadHistory();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Đã đổi sang nguồn: ${source['name']}')),
+                      );
+                    }
+                  }
+                },
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }

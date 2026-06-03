@@ -31,15 +31,15 @@ class KissKhSource implements MovieSource {
     return [
       HomeSection(
         title: 'Trending TV Series',
-        movies: trending.map((e) => Movie(id: e.id, title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
+        movies: trending.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
       ),
       HomeSection(
         title: 'Popular Movies',
-        movies: popularMovie.map((e) => Movie(id: e.id, title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
+        movies: popularMovie.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
       ),
       HomeSection(
         title: 'Recently Updated',
-        movies: recentlyUpdated.map((e) => Movie(id: e.id, title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
+        movies: recentlyUpdated.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
       ),
     ];
   }
@@ -127,7 +127,7 @@ class KissKhSource implements MovieSource {
     );
     
     return list.map((e) => Movie(
-      id: e.id,
+      id: e.id.toString(),
       title: e.title,
       thumbnail: e.thumbnail,
       type: e.type,
@@ -136,18 +136,18 @@ class KissKhSource implements MovieSource {
   }
 
   @override
-  Future<MovieDetail?> getMovieDetail(int id) async {
-    final detail = await _api.getDetail(id);
+  Future<MovieDetail?> getMovieDetail(String id) async {
+    final detail = await _api.getDetail(int.parse(id));
     if (detail == null) return null;
     
     return MovieDetail(
-      id: detail.id,
+      id: detail.id.toString(),
       title: detail.title,
       description: detail.description,
       thumbnail: detail.thumbnail,
       type: detail.type,
       episodes: detail.episodes.map((e) => Episode(
-        id: e.id,
+        id: e.id.toString(),
         number: e.number,
         hasSub: e.sub == 1,
       )).toList(),
@@ -155,14 +155,17 @@ class KissKhSource implements MovieSource {
   }
 
   @override
-  Future<StreamInfo?> getStreamInfo(int movieId, int episodeId) async {
+  Future<StreamInfo?> getStreamInfo(String movieId, String episodeId, {String? serverId}) async {
     try {
+      int parsedMovieId = int.parse(movieId);
+      int parsedEpisodeId = int.parse(episodeId);
+
       // 1. Get Stream kkey natively via extractor
-      final String? streamKkey = await _kkeyExtractor.extractStreamKey(movieId, episodeId);
+      final String? streamKkey = await _kkeyExtractor.extractStreamKey(parsedMovieId, parsedEpisodeId);
       if (streamKkey == null) return null;
 
       // 2. Fetch video url
-      String? videoUrl = await _api.getStreamUrl(episodeId, streamKkey);
+      String? videoUrl = await _api.getStreamUrl(parsedEpisodeId, streamKkey);
       debugPrint('KissKH Stream URL: $videoUrl');
       if (videoUrl == null || videoUrl.isEmpty) return null;
       
@@ -175,10 +178,10 @@ class KissKhSource implements MovieSource {
       }
 
       // 3. Get Subtitle kkey via extractor
-      final String? subKkey = await _kkeyExtractor.extractSubKey(movieId, episodeId);
+      final String? subKkey = await _kkeyExtractor.extractSubKey(parsedMovieId, parsedEpisodeId);
       List<SubtitleTrack> tracks = [];
       if (subKkey != null) {
-        final subs = await _api.getSubtitles(episodeId, subKkey);
+        final subs = await _api.getSubtitles(parsedEpisodeId, subKkey);
         for (int i = 0; i < subs.length; i++) {
           tracks.add(SubtitleTrack(
             id: i + 1,

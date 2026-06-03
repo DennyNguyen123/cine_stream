@@ -12,6 +12,7 @@ class TvControls extends StatefulWidget {
   final VoidCallback onSubtitleToggle;
   final VoidCallback onSettings;
   final VoidCallback onEpisodes;
+  final VoidCallback onServerToggle;
   final VoidCallback onBack;
   final VoidCallback? onPrevEpisode;
   final VoidCallback? onNextEpisode;
@@ -28,6 +29,7 @@ class TvControls extends StatefulWidget {
     required this.onSubtitleToggle,
     required this.onSettings,
     required this.onEpisodes,
+    required this.onServerToggle,
     required this.onBack,
     this.onPrevEpisode,
     this.onNextEpisode,
@@ -75,6 +77,8 @@ class _TvControlsState extends State<TvControls> {
                 Row(
                   children: [
                     _buildIconButton(Icons.list, widget.onEpisodes),
+                    const SizedBox(width: 16),
+                    _buildIconButton(Icons.dns, widget.onServerToggle),
                     const SizedBox(width: 16),
                     _buildIconButton(Icons.closed_caption, widget.onSubtitleToggle),
                     const SizedBox(width: 16),

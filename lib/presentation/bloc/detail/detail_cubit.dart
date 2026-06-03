@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../domain/entities/movie_detail.dart';
-import '../../../../domain/repositories/movie_source.dart';
+import '../../../../domain/repositories/source_manager.dart';
 
 abstract class DetailState {}
 
@@ -19,14 +19,14 @@ class DetailError extends DetailState {
 }
 
 class DetailCubit extends Cubit<DetailState> {
-  final MovieSource _movieSource;
+  final SourceManager _sourceManager;
 
-  DetailCubit(this._movieSource) : super(DetailInitial());
+  DetailCubit(this._sourceManager) : super(DetailInitial());
 
-  Future<void> loadDetail(int movieId) async {
+  Future<void> loadDetail(String movieId) async {
     emit(DetailLoading());
     try {
-      final detail = await _movieSource.getMovieDetail(movieId);
+      final detail = await _sourceManager.activeSource.getMovieDetail(movieId);
       if (detail != null) {
         emit(DetailLoaded(detail));
       } else {

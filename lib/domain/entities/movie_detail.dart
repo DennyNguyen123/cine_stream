@@ -1,7 +1,7 @@
 import 'episode.dart';
 
 class MovieDetail {
-  final int id;
+  final String id;
   final String title;
   final String? description;
   final String? thumbnail;

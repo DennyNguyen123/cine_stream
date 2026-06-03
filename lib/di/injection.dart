@@ -8,7 +8,10 @@ import '../data/repositories/subtitle_repository_impl.dart';
 import '../data/repositories/translation_service.dart';
 import '../data/sources/kisskh/kisskh_api.dart';
 import '../data/sources/kisskh/kisskh_source.dart';
+import '../data/sources/cinemeta/cinemeta_source.dart';
+
 import '../domain/repositories/movie_source.dart';
+import '../domain/repositories/source_manager.dart';
 import '../domain/repositories/subtitle_repository.dart';
 import '../presentation/bloc/detail/detail_cubit.dart';
 import '../presentation/bloc/home/home_cubit.dart';
@@ -33,7 +36,23 @@ Future<void> setupInjection() async {
   
   // Sources
   getIt.registerLazySingleton(() => KissKhApi(getIt()));
-  getIt.registerLazySingleton<MovieSource>(() => KissKhSource(getIt()));
+  
+  final kissKhSource = KissKhSource(getIt());
+  final cinemetaSource = CinemetaSource(getIt());
+
+
+  final sourceManager = SourceManager(
+    prefs: prefs,
+    sources: {
+      'kisskh': kissKhSource,
+      'cinemeta': cinemetaSource,
+    },
+    defaultSourceId: 'cinemeta',
+  );
+  getIt.registerLazySingleton<SourceManager>(() => sourceManager);
+
+  // Provide the active source dynamically
+  getIt.registerFactory<MovieSource>(() => getIt<SourceManager>().activeSource);
 
   // UseCases & Blocs
   getIt.registerFactory(() => HomeCubit(getIt()));

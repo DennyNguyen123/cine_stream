@@ -30,7 +30,7 @@ class HistoryCubit extends Cubit<HistoryState> {
     }
   }
 
-  Future<void> removeHistory(int movieId, String sourceId) async {
+  Future<void> removeHistory(String movieId, String sourceId) async {
     try {
       await _repository.removeHistory(movieId, sourceId);
       loadHistory(); // Reload after deletion

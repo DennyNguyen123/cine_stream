@@ -14,6 +14,6 @@ abstract class MovieSource {
   Future<List<Movie>> searchMovies(String query);
   Future<List<Movie>> advancedSearch(Map<String, dynamic> filters, {int page = 1, String query = ''});
   
-  Future<MovieDetail?> getMovieDetail(int id);
-  Future<StreamInfo?> getStreamInfo(int movieId, int episodeId);
+  Future<MovieDetail?> getMovieDetail(String id);
+  Future<StreamInfo?> getStreamInfo(String movieId, String episodeId, {String? serverId});
 }

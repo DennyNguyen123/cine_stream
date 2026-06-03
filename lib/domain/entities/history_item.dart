@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 class HistoryItem {
-  final int movieId;
+  final String movieId;
   final String movieTitle;
   final String? thumbnail;
-  final int episodeId;
+  final String episodeId;
   final double episodeNumber;
   final int positionMs;
   final int durationMs;
@@ -39,10 +39,10 @@ class HistoryItem {
 
   factory HistoryItem.fromMap(Map<String, dynamic> map) {
     return HistoryItem(
-      movieId: map['movieId']?.toInt() ?? 0,
+      movieId: map['movieId']?.toString() ?? '',
       movieTitle: map['movieTitle'] ?? '',
       thumbnail: map['thumbnail'],
-      episodeId: map['episodeId']?.toInt() ?? 0,
+      episodeId: map['episodeId']?.toString() ?? '',
       episodeNumber: map['episodeNumber']?.toDouble() ?? 0.0,
       positionMs: map['positionMs']?.toInt() ?? 0,
       durationMs: map['durationMs']?.toInt() ?? 0,
@@ -56,10 +56,10 @@ class HistoryItem {
   factory HistoryItem.fromJson(String source) => HistoryItem.fromMap(json.decode(source));
 
   HistoryItem copyWith({
-    int? movieId,
+    String? movieId,
     String? movieTitle,
     String? thumbnail,
-    int? episodeId,
+    String? episodeId,
     double? episodeNumber,
     int? positionMs,
     int? durationMs,

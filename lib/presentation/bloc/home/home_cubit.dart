@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../domain/entities/home_section.dart';
-import '../../../../domain/repositories/movie_source.dart';
+import '../../../../domain/repositories/source_manager.dart';
 
 abstract class HomeState {}
 class HomeInitial extends HomeState {}
@@ -15,14 +15,14 @@ class HomeError extends HomeState {
 }
 
 class HomeCubit extends Cubit<HomeState> {
-  final MovieSource _movieSource;
+  final SourceManager _sourceManager;
 
-  HomeCubit(this._movieSource) : super(HomeInitial());
+  HomeCubit(this._sourceManager) : super(HomeInitial());
 
   Future<void> loadData() async {
     emit(HomeLoading());
     try {
-      final sections = await _movieSource.getHomeSections();
+      final sections = await _sourceManager.activeSource.getHomeSections();
       
       emit(HomeLoaded(
         sections: sections,

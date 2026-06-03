@@ -1,7 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../domain/entities/movie.dart';
+import '../../../../domain/repositories/source_manager.dart';
 import '../../../../domain/entities/filter.dart';
-import '../../../../domain/repositories/movie_source.dart';
 
 abstract class SearchState {}
 
@@ -37,7 +37,7 @@ class SearchError extends SearchState {
 }
 
 class SearchCubit extends Cubit<SearchState> {
-  final MovieSource _movieSource;
+  final SourceManager _sourceManager;
   FilterConfig? _filterConfig;
   final Map<String, dynamic> _currentFilters = {};
   String _currentQuery = '';
@@ -47,19 +47,19 @@ class SearchCubit extends Cubit<SearchState> {
   bool _isFetchingMore = false;
   bool _hasReachedMax = false;
 
-  SearchCubit(this._movieSource) : super(SearchInitial());
+  SearchCubit(this._sourceManager) : super(SearchInitial());
 
   Future<void> initSearch() async {
     emit(SearchLoading(currentFilters: _currentFilters));
     try {
-      _filterConfig = await _movieSource.getFilterConfig();
+      _filterConfig = await _sourceManager.activeSource.getFilterConfig();
       // Initialize default values
       for (var field in _filterConfig!.fields) {
         _currentFilters[field.key] = field.defaultValue;
       }
       
       _currentPage = 1;
-      _currentMovies = await _movieSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
+      _currentMovies = await _sourceManager.activeSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
       _hasReachedMax = _currentMovies.isEmpty;
       
       emit(SearchLoaded(
@@ -84,7 +84,7 @@ class SearchCubit extends Cubit<SearchState> {
     emit(SearchLoading(filterConfig: _filterConfig, currentFilters: _currentFilters));
     
     try {
-      _currentMovies = await _movieSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
+      _currentMovies = await _sourceManager.activeSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
       _hasReachedMax = _currentMovies.isEmpty;
       
       emit(SearchLoaded(
@@ -109,7 +109,7 @@ class SearchCubit extends Cubit<SearchState> {
     emit(SearchLoading(filterConfig: _filterConfig, currentFilters: _currentFilters));
     
     try {
-      _currentMovies = await _movieSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
+      _currentMovies = await _sourceManager.activeSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
       _hasReachedMax = _currentMovies.isEmpty;
       
       emit(SearchLoaded(
@@ -131,7 +131,7 @@ class SearchCubit extends Cubit<SearchState> {
     _currentPage++;
     
     try {
-      final newMovies = await _movieSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
+      final newMovies = await _sourceManager.activeSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
       
       if (newMovies.isEmpty) {
         _hasReachedMax = true;
