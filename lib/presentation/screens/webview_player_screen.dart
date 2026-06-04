@@ -156,10 +156,10 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
                 _controller = controller;
               },
               onLoadStart: (controller, url) {
-                print('[WebViewPlayer] Loading: $url');
+                debugPrint('[WebViewPlayer] Loading: $url');
               },
               onLoadStop: (controller, url) async {
-                print('[WebViewPlayer] Loaded: $url');
+                debugPrint('[WebViewPlayer] Loaded: $url');
                 if (mounted) setState(() => _isLoading = false);
 
                 // Auto-play script: continuously try to play for 5 seconds
@@ -195,10 +195,10 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
                 ''');
               },
               onReceivedError: (controller, request, error) {
-                print('[WebViewPlayer] Error: ${request.url} - ${error.description}');
+                debugPrint('[WebViewPlayer] Error: ${request.url} - ${error.description}');
               },
               onConsoleMessage: (controller, consoleMessage) {
-                print('[WebViewPlayer] Console: ${consoleMessage.message}');
+                debugPrint('[WebViewPlayer] Console: ${consoleMessage.message}');
               },
               // Block popup windows (ads)
               onCreateWindow: (controller, createWindowAction) async {

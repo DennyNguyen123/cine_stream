@@ -1,7 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:webview_windows/webview_windows.dart';
 
 abstract class KkeyExtractor {
@@ -151,3 +151,4 @@ class _WindowsKkeyExtractor extends KkeyExtractor {
     return await _extractKeyFromWebView(episodeId, '/api/Sub/');
   }
 }
+

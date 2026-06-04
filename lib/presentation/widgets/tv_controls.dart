@@ -41,6 +41,13 @@ class TvControls extends StatefulWidget {
 }
 
 class _TvControlsState extends State<TvControls> {
+  final FocusNode _playPauseNode = FocusNode();
+
+  @override
+  void dispose() {
+    _playPauseNode.dispose();
+    super.dispose();
+  }
   String _formatDuration(Duration d) {
     String twoDigits(int n) => n.toString().padLeft(2, "0");
     String twoDigitMinutes = twoDigits(d.inMinutes.remainder(60));
@@ -66,7 +73,7 @@ class _TvControlsState extends State<TvControls> {
               children: [
                 Row(
                   children: [
-                    _buildIconButton(Icons.arrow_back, widget.onBack),
+                    _buildIconButton(Icons.arrow_back, widget.onBack, downFocusNode: _playPauseNode),
                     const SizedBox(width: 16),
                     Text(
                       widget.title,
@@ -76,13 +83,13 @@ class _TvControlsState extends State<TvControls> {
                 ),
                 Row(
                   children: [
-                    _buildIconButton(Icons.list, widget.onEpisodes),
+                    _buildIconButton(Icons.list, widget.onEpisodes, downFocusNode: _playPauseNode),
                     const SizedBox(width: 16),
-                    _buildIconButton(Icons.dns, widget.onServerToggle),
+                    _buildIconButton(Icons.dns, widget.onServerToggle, downFocusNode: _playPauseNode),
                     const SizedBox(width: 16),
-                    _buildIconButton(Icons.closed_caption, widget.onSubtitleToggle),
+                    _buildIconButton(Icons.closed_caption, widget.onSubtitleToggle, downFocusNode: _playPauseNode),
                     const SizedBox(width: 16),
-                    _buildIconButton(Icons.settings, widget.onSettings),
+                    _buildIconButton(Icons.settings, widget.onSettings, downFocusNode: _playPauseNode),
                   ],
                 )
               ],
@@ -107,6 +114,7 @@ class _TvControlsState extends State<TvControls> {
                         size: 64,
                         autoFocus: true,
                         key: const ValueKey('play_pause'),
+                        focusNode: _playPauseNode,
                       ),
                       if (widget.onNextEpisode != null) ...[
                         const SizedBox(width: 32),
@@ -132,6 +140,7 @@ class _TvControlsState extends State<TvControls> {
                     position: widget.position,
                     duration: widget.duration,
                     onSeek: widget.onSeek,
+                    upFocusNode: _playPauseNode,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -147,13 +156,15 @@ class _TvControlsState extends State<TvControls> {
     );
   }
 
-  Widget _buildIconButton(IconData icon, VoidCallback onTap, {double size = 32, bool autoFocus = false, Key? key}) {
+  Widget _buildIconButton(IconData icon, VoidCallback onTap, {double size = 32, bool autoFocus = false, Key? key, FocusNode? focusNode, FocusNode? downFocusNode}) {
     return _TvControlButton(
       key: key,
       icon: icon,
       onTap: onTap,
       size: size,
       autoFocus: autoFocus,
+      focusNode: focusNode,
+      downFocusNode: downFocusNode,
     );
   }
 }
@@ -163,6 +174,8 @@ class _TvControlButton extends StatefulWidget {
   final VoidCallback onTap;
   final double size;
   final bool autoFocus;
+  final FocusNode? focusNode;
+  final FocusNode? downFocusNode;
 
   const _TvControlButton({
     super.key,
@@ -170,6 +183,8 @@ class _TvControlButton extends StatefulWidget {
     required this.onTap,
     this.size = 32,
     this.autoFocus = false,
+    this.focusNode,
+    this.downFocusNode,
   });
 
   @override
@@ -183,7 +198,7 @@ class _TvControlButtonState extends State<_TvControlButton> {
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
+    _focusNode = widget.focusNode ?? FocusNode();
     if (widget.autoFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _focusNode.requestFocus();
@@ -193,7 +208,9 @@ class _TvControlButtonState extends State<_TvControlButton> {
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    if (widget.focusNode == null) {
+      _focusNode.dispose();
+    }
     super.dispose();
   }
 
@@ -203,9 +220,15 @@ class _TvControlButtonState extends State<_TvControlButton> {
       focusNode: _focusNode,
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
-          widget.onTap();
-          return KeyEventResult.handled;
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown && widget.downFocusNode != null) {
+            widget.downFocusNode!.requestFocus();
+            return KeyEventResult.handled;
+          }
         }
         return KeyEventResult.ignored;
       },
@@ -246,11 +269,13 @@ class _TvSlider extends StatefulWidget {
   final Duration position;
   final Duration duration;
   final Function(int)? onSeek;
+  final FocusNode? upFocusNode;
 
   const _TvSlider({
     required this.position,
     required this.duration,
     this.onSeek,
+    this.upFocusNode,
   });
 
   @override
@@ -265,14 +290,20 @@ class _TvSliderState extends State<_TvSlider> {
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onKeyEvent: (node, event) {
-        if (widget.onSeek != null && event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-            widget.onSeek!(-10);
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp && widget.upFocusNode != null) {
+            widget.upFocusNode!.requestFocus();
             return KeyEventResult.handled;
           }
-          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-            widget.onSeek!(10);
-            return KeyEventResult.handled;
+          if (widget.onSeek != null) {
+            if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+              widget.onSeek!(-10);
+              return KeyEventResult.handled;
+            }
+            if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+              widget.onSeek!(10);
+              return KeyEventResult.handled;
+            }
           }
         }
         return KeyEventResult.ignored;

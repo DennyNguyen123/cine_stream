@@ -54,7 +54,7 @@ class VidplayExtractor {
       ),
       initialUserScripts: UnmodifiableListView<UserScript>([
         UserScript(
-          source: 'window.DisableDevtool = function() { console.log("Blocked disable-devtool execution"); };',
+          source: 'window.DisableDevtool = function() { console.log("Blocked disable-devtool execution"); }; window.alert = function(){}; window.confirm = function(){return true;}; window.prompt = function(){return null;};',
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
           forMainFrameOnly: false,
         ),
@@ -130,8 +130,12 @@ class VidplayExtractor {
               final streamCookies = await cookieManager.getCookies(url: WebUri(reqUrl));
               
               final allCookies = <String, Cookie>{};
-              for (var c in iframeCookies) allCookies[c.name] = c;
-              for (var c in streamCookies) allCookies[c.name] = c;
+              for (var c in iframeCookies) {
+                allCookies[c.name] = c;
+              }
+              for (var c in streamCookies) {
+                allCookies[c.name] = c;
+              }
               
               if (allCookies.isNotEmpty) {
                 headers['Cookie'] = allCookies.values.map((c) => '${c.name}=${c.value}').join('; ');
@@ -205,6 +209,15 @@ class VidplayExtractor {
             completer.complete(StreamInfo(videoUrl: foundStreamUrl!, subtitles: subtitles, headers: headers));
           }
         }
+      },
+      onJsAlert: (controller, jsAlertRequest) async {
+        return JsAlertResponse(handledByClient: true, action: JsAlertResponseAction.CONFIRM);
+      },
+      onJsConfirm: (controller, jsConfirmRequest) async {
+        return JsConfirmResponse(handledByClient: true, action: JsConfirmResponseAction.CONFIRM);
+      },
+      onJsPrompt: (controller, jsPromptRequest) async {
+        return JsPromptResponse(handledByClient: true, action: JsPromptResponseAction.CONFIRM);
       },
     );
 

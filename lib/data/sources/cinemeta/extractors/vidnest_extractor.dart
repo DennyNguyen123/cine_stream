@@ -129,8 +129,12 @@ class VidnestExtractor {
               final streamCookies = await cookieManager.getCookies(url: WebUri(reqUrl));
               
               final allCookies = <String, Cookie>{};
-              for (var c in iframeCookies) allCookies[c.name] = c;
-              for (var c in streamCookies) allCookies[c.name] = c;
+              for (var c in iframeCookies) {
+                allCookies[c.name] = c;
+              }
+              for (var c in streamCookies) {
+                allCookies[c.name] = c;
+              }
               
               if (allCookies.isNotEmpty) {
                 headers['Cookie'] = allCookies.values.map((c) => '${c.name}=${c.value}').join('; ');
@@ -183,7 +187,8 @@ class VidnestExtractor {
         }
         return request;
       },
-      onConsoleMessage: (controller, consoleMessage) {
+      shouldOverrideUrlLoading: (controller, navigationAction) async { return NavigationActionPolicy.CANCEL; },
+onConsoleMessage: (controller, consoleMessage) {
         final msg = consoleMessage.message;
         if (msg.startsWith('VIDEO_SRC:') || msg.startsWith('VIDEO_CURRENT_SRC:')) {
           final videoUrl = msg.split(':').skip(1).join(':');
@@ -193,13 +198,22 @@ class VidnestExtractor {
             timeoutTimer.cancel();
             
             final headers = {
-              'Referer': 'https://vidnest.fun/',
-              'Origin': 'https://vidnest.fun',
+              'Referer': 'https://vidnest.cloud/',
+              'Origin': 'https://vidnest.cloud',
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             };
             completer.complete(StreamInfo(videoUrl: foundStreamUrl!, subtitles: subtitles, headers: headers));
           }
         }
+      },
+      onJsAlert: (controller, jsAlertRequest) async {
+        return JsAlertResponse(handledByClient: true, action: JsAlertResponseAction.CONFIRM);
+      },
+      onJsConfirm: (controller, jsConfirmRequest) async {
+        return JsConfirmResponse(handledByClient: true, action: JsConfirmResponseAction.CONFIRM);
+      },
+      onJsPrompt: (controller, jsPromptRequest) async {
+        return JsPromptResponse(handledByClient: true, action: JsPromptResponseAction.CONFIRM);
       },
     );
 

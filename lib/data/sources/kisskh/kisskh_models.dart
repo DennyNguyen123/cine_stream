@@ -4,6 +4,7 @@ class KissKhMovieJson {
   final String? thumbnail;
   final String? type;
   final String? status; // or label
+  final int? episodesCount;
 
   KissKhMovieJson({
     required this.id,
@@ -11,6 +12,7 @@ class KissKhMovieJson {
     this.thumbnail,
     this.type,
     this.status,
+    this.episodesCount,
   });
 
   factory KissKhMovieJson.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class KissKhMovieJson {
       thumbnail: json['thumbnail'] as String?,
       type: json['type'] as String?,
       status: json['status'] as String? ?? json['label'] as String?,
+      episodesCount: json['episodesCount'] as int?,
     );
   }
 }

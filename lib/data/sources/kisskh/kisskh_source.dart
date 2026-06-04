@@ -31,15 +31,15 @@ class KissKhSource implements MovieSource {
     return [
       HomeSection(
         title: 'Trending TV Series',
-        movies: trending.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
+        movies: trending.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status, totalEpisodes: e.episodesCount)).toList(),
       ),
       HomeSection(
         title: 'Popular Movies',
-        movies: popularMovie.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
+        movies: popularMovie.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status, totalEpisodes: e.episodesCount)).toList(),
       ),
       HomeSection(
         title: 'Recently Updated',
-        movies: recentlyUpdated.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status)).toList(),
+        movies: recentlyUpdated.map((e) => Movie(id: e.id.toString(), title: e.title, thumbnail: e.thumbnail, type: e.type, status: e.status, totalEpisodes: e.episodesCount)).toList(),
       ),
     ];
   }
@@ -132,6 +132,7 @@ class KissKhSource implements MovieSource {
       thumbnail: e.thumbnail,
       type: e.type,
       status: e.status,
+      totalEpisodes: e.episodesCount,
     )).toList();
   }
 

@@ -18,7 +18,7 @@ class CinemetaSource implements MovieSource {
   CinemetaSource(this._dio);
 
   @override
-  String get sourceName => 'Cinemeta (Stremio)';
+  String get sourceName => 'Cinemeta';
 
   @override
   String get sourceIcon => 'https://www.stremio.com/website/stremio-logo-small.png';
@@ -75,12 +75,17 @@ class CinemetaSource implements MovieSource {
     final results = <Movie>[];
     try {
       final type = filters['type'] ?? 'movie';
-      final skip = (page - 1) * 20; // Assuming 20 items per page
-      final skipParam = skip > 0 ? 'skip=$skip' : '';
+      final genre = filters['genre'] ?? '';
       
-      final url = skipParam.isNotEmpty 
-          ? '$_baseUrl/catalog/$type/top/$skipParam.json'
-          : '$_baseUrl/catalog/$type/top.json';
+      final skip = (page - 1) * 20; // Assuming 20 items per page
+      
+      List<String> extraParams = [];
+      if (genre.isNotEmpty) extraParams.add('genre=$genre');
+      if (skip > 0) extraParams.add('skip=$skip');
+      
+      final paramsString = extraParams.isNotEmpty ? '/${extraParams.join('&')}' : '';
+      
+      final url = '$_baseUrl/catalog/$type/top$paramsString.json';
           
       final res = await _dio.get(url);
       if (res.data['metas'] != null) {
@@ -103,6 +108,32 @@ class CinemetaSource implements MovieSource {
           options: [
             FilterOption(value: 'movie', label: 'Movie'),
             FilterOption(value: 'series', label: 'Series'),
+          ],
+        ),
+        FilterField(
+          key: 'genre',
+          title: 'Genre',
+          defaultValue: '',
+          options: [
+            FilterOption(value: '', label: 'All Genres'),
+            FilterOption(value: 'Action', label: 'Action'),
+            FilterOption(value: 'Adventure', label: 'Adventure'),
+            FilterOption(value: 'Animation', label: 'Animation'),
+            FilterOption(value: 'Comedy', label: 'Comedy'),
+            FilterOption(value: 'Crime', label: 'Crime'),
+            FilterOption(value: 'Documentary', label: 'Documentary'),
+            FilterOption(value: 'Drama', label: 'Drama'),
+            FilterOption(value: 'Family', label: 'Family'),
+            FilterOption(value: 'Fantasy', label: 'Fantasy'),
+            FilterOption(value: 'History', label: 'History'),
+            FilterOption(value: 'Horror', label: 'Horror'),
+            FilterOption(value: 'Music', label: 'Music'),
+            FilterOption(value: 'Mystery', label: 'Mystery'),
+            FilterOption(value: 'Romance', label: 'Romance'),
+            FilterOption(value: 'Science Fiction', label: 'Sci-Fi'),
+            FilterOption(value: 'Thriller', label: 'Thriller'),
+            FilterOption(value: 'War', label: 'War'),
+            FilterOption(value: 'Western', label: 'Western'),
           ],
         )
       ],
@@ -132,7 +163,7 @@ class CinemetaSource implements MovieSource {
             id: 'tv/$imdbId/$season/$episode',
             number: double.parse(episode.toString()),
             season: int.parse(season.toString()),
-            title: v['title'] ?? 'S${season}E${episode}',
+            title: v['title'] ?? 'S${season}E$episode',
           ));
         }
       } else if (!isTv) {
@@ -144,6 +175,12 @@ class CinemetaSource implements MovieSource {
         ));
       }
 
+      episodes.sort((a, b) {
+        int seasonCompare = (a.season ?? 1).compareTo(b.season ?? 1);
+        if (seasonCompare != 0) return seasonCompare;
+        return a.number.compareTo(b.number);
+      });
+
       return MovieDetail(
         id: movieId,
         title: meta['name'] ?? '',
@@ -151,6 +188,10 @@ class CinemetaSource implements MovieSource {
         thumbnail: meta['poster'] ?? meta['background'] ?? '',
         type: isTv ? 'series' : 'movie',
         episodes: episodes,
+        servers: [
+          VideoServer(id: 'vnest', name: 'Vidnest'),
+          VideoServer(id: 'vpls', name: 'Vidplay')
+        ],
       );
     } catch (e) {
       print('Cinemeta getMovieDetail Error: $e');
@@ -197,8 +238,9 @@ class CinemetaSource implements MovieSource {
           final src = match.group(1)!.replaceAll('&amp;', '&');
           String serverName = 'Unknown';
           
-          if (src.contains('vnest')) serverName = 'Vidnest';
-          else if (src.contains('vpls')) serverName = 'Vidplay';
+          if (src.contains('vnest')) {
+            serverName = 'Vidnest';
+          } else if (src.contains('vpls')) serverName = 'Vidplay';
           else continue; // Bỏ qua các server không thuộc Vidnest hoặc Vidplay
           
           // Only add if not already in list to avoid duplicates
@@ -209,8 +251,13 @@ class CinemetaSource implements MovieSource {
 
         // Determine target server URL
         if (serverId != null && serverId.isNotEmpty) {
-          targetServerUrl = serverId;
-        } else {
+          final found = servers.where((s) => s.id.contains(serverId)).toList();
+          if (found.isNotEmpty) {
+            targetServerUrl = found.first.id;
+          }
+        } 
+        
+        if (targetServerUrl == null) {
           // Select preferred
           for (final domain in preferredDomains) {
             final found = servers.where((s) => s.id.contains(domain)).toList();
@@ -270,11 +317,21 @@ class CinemetaSource implements MovieSource {
 
   Movie _parseMovie(Map<String, dynamic> data, {required bool isTv}) {
     final type = isTv ? 'series' : 'movie';
+    String? yearStr;
+    final releaseInfo = data['releaseInfo']?.toString() ?? data['year']?.toString();
+    if (releaseInfo != null) {
+      if (releaseInfo.length >= 4) {
+        yearStr = releaseInfo.substring(0, 4);
+      } else {
+        yearStr = releaseInfo;
+      }
+    }
     return Movie(
       id: '$type/${data['id']}',
       title: data['name'] ?? '',
       thumbnail: data['poster'] ?? '',
       type: type,
+      year: yearStr,
     );
   }
 }

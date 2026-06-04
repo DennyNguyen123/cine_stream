@@ -91,12 +91,6 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
               },
             ),
           ),
-          
-          const SizedBox(height: 24),
-          const Text(
-            'Subtitle Settings (Size, Background, etc.) coming soon...',
-            style: TextStyle(color: Colors.white54, fontSize: 14),
-          ),
         ],
       ),
     );

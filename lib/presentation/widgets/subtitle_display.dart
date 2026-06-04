@@ -27,10 +27,10 @@ class DualSubtitleDisplay extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (topCue != null && isDualEnabled)
-            _buildSubText(topCue!.text, AppColors.subtitleTop, 22),
+          if (topCue != null)
+            _buildSubText(topCue!.text, isDualEnabled ? AppColors.subtitleTop : AppColors.subtitleTop, isDualEnabled ? 22 : 24),
           
-          if (topCue != null && isDualEnabled)
+          if (topCue != null && bottomCue != null)
             const SizedBox(height: 4),
 
           if (bottomCue != null)

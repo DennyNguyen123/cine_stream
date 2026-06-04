@@ -5,11 +5,15 @@ import '../../../core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'marquee_text.dart';
 
+import '../../../domain/repositories/source_manager.dart';
+import '../../../di/injection.dart';
+
 class MovieCard extends StatefulWidget {
   final Movie movie;
   final VoidCallback onFocused;
   final VoidCallback onClick;
   final bool autoFocus;
+  final FocusNode? focusNode;
 
   const MovieCard({
     super.key,
@@ -17,6 +21,7 @@ class MovieCard extends StatefulWidget {
     required this.onFocused,
     required this.onClick,
     this.autoFocus = false,
+    this.focusNode,
   });
 
   @override
@@ -29,6 +34,7 @@ class _MovieCardState extends State<MovieCard> {
   @override
   Widget build(BuildContext context) {
     return Focus(
+      focusNode: widget.focusNode,
       autofocus: widget.autoFocus,
       onFocusChange: (focused) {
         setState(() {
@@ -76,7 +82,7 @@ class _MovieCardState extends State<MovieCard> {
                 fit: StackFit.expand,
                 children: [
                   // Poster
-                  if (widget.movie.thumbnail != null)
+                  if (widget.movie.thumbnail != null && widget.movie.thumbnail!.isNotEmpty)
                     CachedNetworkImage(
                       imageUrl: widget.movie.thumbnail!,
                       fit: BoxFit.cover,
@@ -102,27 +108,28 @@ class _MovieCardState extends State<MovieCard> {
                     ),
                   ),
 
-                  // Badge DUAL SUB (Fake for UI clone)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha:0.75),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: AppColors.primary.withValues(alpha:0.8), width: 1),
-                      ),
-                      child: const Text(
-                        'DUAL SUB',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
+                  // Badge DUAL SUB (Only show for KissKH where soft subs are available)
+                  if (getIt<SourceManager>().activeSourceId == 'kisskh')
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha:0.75),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppColors.primary.withValues(alpha:0.8), width: 1),
+                        ),
+                        child: const Text(
+                          'DUAL SUB',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
                   // Title & Metadata
                   Positioned(
@@ -141,25 +148,19 @@ class _MovieCardState extends State<MovieCard> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
                           children: [
-                            Text(
-                              widget.movie.type ?? 'Movie',
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              widget.movie.status ?? 'Subbed',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 9,
-                              ),
-                            ),
+                            if (widget.movie.year != null && widget.movie.year!.isNotEmpty)
+                              _buildBadge(widget.movie.year!),
+                            if (widget.movie.type != null && widget.movie.type!.isNotEmpty)
+                              _buildBadge(widget.movie.type!, color: AppColors.primary),
+                            if (widget.movie.totalEpisodes != null && widget.movie.totalEpisodes! > 0)
+                              _buildBadge('${widget.movie.totalEpisodes} EPS'),
+                            if (widget.movie.status != null && widget.movie.status!.isNotEmpty)
+                              _buildBadge(widget.movie.status!),
                           ],
                         ),
                       ],
@@ -185,6 +186,25 @@ class _MovieCardState extends State<MovieCard> {
             fontSize: 60,
             fontWeight: FontWeight.bold,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge(String text, {Color color = Colors.white70}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 0.5),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: 8,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );

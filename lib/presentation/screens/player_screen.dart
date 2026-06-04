@@ -13,6 +13,7 @@ import '../../domain/entities/history_item.dart';
 import '../../domain/entities/episode.dart';
 import '../../core/utils/subtitle_parser.dart';
 import '../../data/repositories/translation_service.dart';
+import '../../data/repositories/external_subtitle_repository.dart';
 import '../../data/repositories/history_repository.dart';
 import '../../domain/repositories/movie_source.dart';
 import '../../di/injection.dart';
@@ -30,6 +31,7 @@ class PlayerScreen extends StatefulWidget {
   final double episodeNumber;
   final int startPositionMs;
   final List<Episode> allEpisodes;
+  final String? serverId;
 
   const PlayerScreen({
     super.key,
@@ -41,7 +43,8 @@ class PlayerScreen extends StatefulWidget {
     required this.episodeId,
     required this.episodeNumber,
     this.startPositionMs = 0,
-    this.allEpisodes = const [],
+    required this.allEpisodes,
+    this.serverId,
   });
 
   @override
@@ -71,6 +74,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   SubtitleCue? _currentSecondaryCue;
   SubtitleTrack? _selectedSub;
   SubtitleTrack? _selectedSecondarySub;
+
+  List<SubtitleTrack> _availableSubtitles = [];
+  bool _isFetchingExternal = false;
+  int _topSubDelayMs = 0;
+  int _bottomSubDelayMs = 0;
 
   int _backPressCount = 0;
   Timer? _backPressTimer;
@@ -102,13 +110,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
       }();
 
-      _controller = VideoPlayerController.networkUrl(
-        Uri.parse(widget.streamInfo.videoUrl),
-        formatHint: widget.streamInfo.videoUrl.contains('.mp4') ? VideoFormat.other : VideoFormat.hls,
-        httpHeaders: widget.streamInfo.headers ?? {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-    )..initialize().then((_) {
+      if (widget.streamInfo.videoUrl.startsWith('http')) {
+        _controller = VideoPlayerController.networkUrl(
+          Uri.parse(widget.streamInfo.videoUrl),
+          formatHint: widget.streamInfo.videoUrl.contains('.mp4') ? VideoFormat.other : VideoFormat.hls,
+          httpHeaders: widget.streamInfo.headers ?? {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        );
+      } else {
+        _controller = VideoPlayerController.file(
+          File(widget.streamInfo.videoUrl),
+        );
+      }
+      
+      _controller.initialize().then((_) {
         setState(() {
           _duration = _controller.value.duration;
         });
@@ -135,44 +151,101 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _saveHistory();
     });
     
-    if (widget.streamInfo.subtitles.isNotEmpty) {
-      final prefs = getIt<SharedPreferences>();
-      final prefTop = prefs.getString('pref_sub_top') ?? 'english';
-      final prefBottom = prefs.getString('pref_sub_bottom') ?? 'viet';
+    _availableSubtitles = List.from(widget.streamInfo.subtitles);
+    _fetchExternalSubtitles().then((_) {
+      _setupInitialSubtitles();
+    });
+  }
 
-      if (prefTop != 'off') {
-        try {
-          final topSub = widget.streamInfo.subtitles.firstWhere(
-            (s) => s.label.toLowerCase().contains(prefTop.toLowerCase()),
-            orElse: () => widget.streamInfo.subtitles.first,
-          );
-          _fetchSubtitles(topSub, true);
-        } catch (e) {
-          debugPrint('Auto-fetch top subtitle error: $e');
-        }
+  Future<void> _fetchExternalSubtitles() async {
+    setState(() => _isFetchingExternal = true);
+    try {
+      final extRepo = getIt<ExternalSubtitleRepository>();
+      
+      int? season;
+      int? episode;
+      
+      // Only extract season/episode if it is a series.
+      // Movies might have a dummy episode with season=1, episode=1 which breaks OpenSubtitles API.
+      bool isSeries = widget.movieId.startsWith('series/');
+      
+      if (isSeries && widget.allEpisodes.isNotEmpty) {
+         final ep = widget.allEpisodes.firstWhere((e) => e.id == widget.episodeId, orElse: () => widget.allEpisodes.first);
+         season = ep.season;
+         episode = ep.number.toInt();
       }
+      
+      final extraSubs = await extRepo.getSubtitles(widget.movieId, season: season, episode: episode);
+      if (mounted) {
+        setState(() {
+          _availableSubtitles.addAll(extraSubs);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetch external subs: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingExternal = false);
+      }
+    }
+  }
 
-      if (prefBottom != 'off') {
-        try {
-          final bottomSub = widget.streamInfo.subtitles.firstWhere(
-            (s) => s.label.toLowerCase().contains(prefBottom.toLowerCase()),
-            orElse: () {
-               if (prefBottom.contains('translate_vi')) {
-                  return const SubtitleTrack(id: -1, label: 'Vietnamese (Translate)', src: 'translate_vi');
-               }
-               throw Exception('Not found');
-            }
-          );
-          if (bottomSub.src == 'translate_vi') {
-             _translateSubtitles(bottomSub, false);
-          } else {
-             _fetchSubtitles(bottomSub, false);
-          }
-        } catch (e) {
-          debugPrint('Auto-fetch bottom subtitle error: $e');
+  String _getBaseLanguage(SubtitleTrack sub) {
+    if (sub.src.startsWith('translate_')) {
+      return sub.label;
+    }
+    return sub.label.replaceAll(RegExp(r'\s*\d+$'), '').trim();
+  }
+
+  void _applySubtitle(SubtitleTrack sub, bool isTop, {required int trackIndex}) {
+     final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
+     final baseLang = _getBaseLanguage(sub);
+     
+     final prefs = getIt<SharedPreferences>();
+     if (sub.src.startsWith('translate_')) {
+        prefs.setString('${prefPrefix}_lang', sub.src);
+     } else {
+        prefs.setString('${prefPrefix}_lang', baseLang.toLowerCase());
+     }
+     prefs.setInt('${prefPrefix}_track', trackIndex);
+     
+     if (sub.src.startsWith('translate_')) {
+        final target = sub.src.split('_')[1];
+        _translateSubtitles(sub, isTop, targetLang: target);
+     } else {
+        _fetchSubtitles(sub, isTop);
+     }
+  }
+
+  void _setupInitialSubtitles() {
+    if (_availableSubtitles.isEmpty) return;
+    final prefs = getIt<SharedPreferences>();
+    
+    void applyPref(bool isTop) {
+      final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
+      final prefLang = prefs.getString('${prefPrefix}_lang') ?? (isTop ? 'english' : 'vietnamese');
+      final prefTrack = prefs.getInt('${prefPrefix}_track') ?? 0;
+      
+      if (prefLang == 'off') return;
+      
+      if (prefLang.startsWith('translate_')) {
+        final target = prefLang.split('_')[1];
+        final label = target == 'vi' ? 'Vietnamese (Translate)' : 'English (Translate)';
+        final tSub = SubtitleTrack(id: -1, label: label, src: prefLang);
+        _translateSubtitles(tSub, isTop, targetLang: target);
+      } else {
+        final tracks = _availableSubtitles.where((s) => _getBaseLanguage(s).toLowerCase() == prefLang.toLowerCase()).toList();
+        if (tracks.isNotEmpty) {
+           final trackIdx = prefTrack < tracks.length ? prefTrack : 0;
+           _fetchSubtitles(tracks[trackIdx], isTop);
+        } else {
+           _fetchSubtitles(_availableSubtitles.first, isTop);
         }
       }
     }
+    
+    applyPref(true);
+    applyPref(false);
   }
 
   Future<void> _fetchSubtitles(SubtitleTrack sub, bool isTop) async {
@@ -189,6 +262,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             _selectedSecondarySub = sub;
             _secondaryCues = parsedCues;
           }
+          _videoListener();
         });
       }
     } catch (e) {
@@ -196,20 +270,35 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
-  Future<void> _translateSubtitles(SubtitleTrack targetSub, bool isTop) async {
+  Future<void> _translateSubtitles(SubtitleTrack targetSub, bool isTop, {String targetLang = 'vi'}) async {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Translating... this may take a moment')));
     
     try {
-      if (widget.streamInfo.subtitles.isEmpty) {
+      if (_availableSubtitles.isEmpty) {
         throw Exception("No source subtitles available to translate from.");
       }
       
-      final engSub = widget.streamInfo.subtitles.firstWhere(
-        (s) => s.label.toLowerCase().contains('english'),
-        orElse: () => widget.streamInfo.subtitles.first,
-      );
+      final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
+      final srcLang = getIt<SharedPreferences>().getString('${prefPrefix}_trans_lang');
+      final srcTrackIdx = getIt<SharedPreferences>().getInt('${prefPrefix}_trans_track') ?? 0;
       
-      final response = await Dio().get(engSub.src);
+      SubtitleTrack sourceSub;
+      
+      if (srcLang != null) {
+         final tracks = _availableSubtitles.where((s) => _getBaseLanguage(s).toLowerCase() == srcLang.toLowerCase()).toList();
+         if (tracks.isNotEmpty) {
+             sourceSub = tracks[srcTrackIdx < tracks.length ? srcTrackIdx : 0];
+         } else {
+             sourceSub = _availableSubtitles.first;
+         }
+      } else {
+         sourceSub = _availableSubtitles.firstWhere(
+            (s) => s.label.toLowerCase().contains('english'),
+            orElse: () => _availableSubtitles.first,
+         );
+      }
+      
+      final response = await Dio().get(sourceSub.src);
       final parsedCues = SubtitleParser.parse(response.data.toString());
       
       final translator = getIt<TranslationService>();
@@ -221,7 +310,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       
       for (var cue in parsedCues) {
         if (currentCharCount + cue.text.length > 3000) {
-          final translatedTexts = await translator.translateBatch(currentBatch, targetLang: 'vi');
+          final translatedTexts = await translator.translateBatch(currentBatch, targetLang: targetLang);
           for (int i = 0; i < currentCueBatch.length; i++) {
             translatedCues.add(SubtitleCue(
               startMs: currentCueBatch[i].startMs,
@@ -239,7 +328,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
       
       if (currentBatch.isNotEmpty) {
-          final translatedTexts = await translator.translateBatch(currentBatch, targetLang: 'vi');
+          final translatedTexts = await translator.translateBatch(currentBatch, targetLang: targetLang);
           for (int i = 0; i < currentCueBatch.length; i++) {
             translatedCues.add(SubtitleCue(
               startMs: currentCueBatch[i].startMs,
@@ -258,6 +347,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             _selectedSecondarySub = targetSub;
             _secondaryCues = translatedCues;
           }
+          _videoListener(); // Recalculate cue immediately if paused
         });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Translation applied!')));
       }
@@ -272,13 +362,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _videoListener() {
     if (!mounted) return;
     
-    final posMs = _controller.value.position.inMilliseconds;
+    final posMsTop = _controller.value.position.inMilliseconds - _topSubDelayMs;
+    final posMsBottom = _controller.value.position.inMilliseconds - _bottomSubDelayMs;
+    
     SubtitleCue? activePrimary;
     SubtitleCue? activeSecondary;
     
     // Quick search for current primary subtitle cue
     for (var cue in _primaryCues) {
-      if (posMs >= cue.startMs && posMs <= cue.endMs) {
+      if (posMsTop >= cue.startMs && posMsTop <= cue.endMs) {
         activePrimary = cue;
         break;
       }
@@ -286,7 +378,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     // Quick search for current secondary subtitle cue
     for (var cue in _secondaryCues) {
-      if (posMs >= cue.startMs && posMs <= cue.endMs) {
+      if (posMsBottom >= cue.startMs && posMsBottom <= cue.endMs) {
         activeSecondary = cue;
         break;
       }
@@ -309,19 +401,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _playNextEpisode() {
     if (widget.allEpisodes.isEmpty) return;
     
-    final sortedEpisodes = widget.allEpisodes.toList()..sort((a, b) => a.number.compareTo(b.number));
-    final currentIndex = sortedEpisodes.indexWhere((e) => e.number == widget.episodeNumber);
+    final sortedEpisodes = widget.allEpisodes.toList()..sort((a, b) {
+      int seasonCompare = (a.season ?? 1).compareTo(b.season ?? 1);
+      if (seasonCompare != 0) return seasonCompare;
+      return a.number.compareTo(b.number);
+    });
+    final currentIndex = sortedEpisodes.indexWhere((e) => e.id == widget.episodeId);
     if (currentIndex != -1 && currentIndex < sortedEpisodes.length - 1) {
       final nextEp = sortedEpisodes[currentIndex + 1];
       _changeEpisode(nextEp);
     }
   }
 
-  void _playPrevEpisode() {
+  void playPrevEpisode() {
     if (widget.allEpisodes.isEmpty) return;
     
-    final sortedEpisodes = widget.allEpisodes.toList()..sort((a, b) => a.number.compareTo(b.number));
-    final currentIndex = sortedEpisodes.indexWhere((e) => e.number == widget.episodeNumber);
+    final sortedEpisodes = widget.allEpisodes.toList()..sort((a, b) {
+      int seasonCompare = (a.season ?? 1).compareTo(b.season ?? 1);
+      if (seasonCompare != 0) return seasonCompare;
+      return a.number.compareTo(b.number);
+    });
+    final currentIndex = sortedEpisodes.indexWhere((e) => e.id == widget.episodeId);
     if (currentIndex > 0) {
       final prevEp = sortedEpisodes[currentIndex - 1];
       _changeEpisode(prevEp);
@@ -344,14 +444,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     try {
       final source = getIt<MovieSource>();
-      final streamInfo = await source.getStreamInfo(widget.movieId, nextEp.id);
+      final streamInfo = await source.getStreamInfo(
+        widget.movieId, 
+        nextEp.id, 
+        serverId: widget.serverId,
+      );
       
       if (!mounted) return;
       
       Navigator.pop(context); // hide loading
       
       if (streamInfo != null) {
-        final title = '${widget.movieTitle} - Tập ${nextEp.number.toInt()}';
+        final hasMultipleSeasons = widget.allEpisodes.map((e) => e.season).toSet().length > 1;
+        String titleStr = nextEp.title ?? 'Episode ${nextEp.number.toInt()}';
+        if (hasMultipleSeasons && !titleStr.toUpperCase().startsWith('S${nextEp.season}')) {
+          titleStr = 'S${nextEp.season} - $titleStr';
+        }
+        String title = '${widget.movieTitle} - $titleStr';
+        if (widget.movieTitle == titleStr) { // Assuming we only have 'movieTitle' here, we don't have 'type'. But for movies, titleStr equals the movie title in most sources like cinemeta.
+          title = widget.movieTitle;
+        }
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => PlayerScreen(
@@ -437,7 +549,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
-  void _toggleControls() {
+  void toggleControls() {
     setState(() => _showControls = !_showControls);
     if (_showControls) {
       _startControlsTimer();
@@ -544,7 +656,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               }
               
               if (!_showControls) {
-                _toggleControls();
+                toggleControls();
               }
               
               if (!_isSeeking) {
@@ -588,7 +700,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
             // Wake up controls on other keys
             if (!_showControls) {
-              _toggleControls();
+              toggleControls();
               return KeyEventResult.handled;
             }
           }
@@ -598,7 +710,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           behavior: HitTestBehavior.opaque,
           onTap: () {
             if (!_showControls) {
-              _toggleControls();
+              toggleControls();
             }
           },
           child: Stack(
@@ -618,7 +730,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: DualSubtitleDisplay(
                   topCue: _currentPrimaryCue,
                   bottomCue: _currentSecondaryCue,
-                  isDualEnabled: (_currentPrimaryCue != null && _currentSecondaryCue != null),
+                  isDualEnabled: (_selectedSub != null && _selectedSecondarySub != null),
                 ),
               ),
 
@@ -635,12 +747,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     },
                     child: Builder(
                       builder: (context) {
-                        final sortedEpisodes = widget.allEpisodes.toList()..sort((a, b) => a.number.compareTo(b.number));
-                        final currentIndex = sortedEpisodes.indexWhere((e) => e.number == widget.episodeNumber);
+                        final sortedEpisodes = widget.allEpisodes.toList()..sort((a, b) {
+                          int seasonCompare = (a.season ?? 1).compareTo(b.season ?? 1);
+                          if (seasonCompare != 0) return seasonCompare;
+                          return a.number.compareTo(b.number);
+                        });
+                        final currentIndex = sortedEpisodes.indexWhere((e) => e.id == widget.episodeId);
                         
                         VoidCallback? prevEpCallback;
                         if (currentIndex > 0) {
-                          prevEpCallback = _playPrevEpisode;
+                          prevEpCallback = playPrevEpisode;
                         }
                         
                         VoidCallback? nextEpCallback;
@@ -752,53 +868,159 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Widget _buildSubtitleSelectionDialog(BuildContext context) {
     return Dialog(
       backgroundColor: AppColors.surface,
-      child: Container(
-        width: 400,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('Dual Subtitles Selection', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+      child: StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Container(
+            width: 450,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('Dual Subtitles Selection', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                ),
+                _buildSubtitleRow(
+                  context: context,
+                  title: 'Top Subtitle',
+                  sub: _selectedSub,
+                  isTop: true,
+                  delayMs: _topSubDelayMs,
+                  onDelayChanged: (val) {
+                    final newVal = _topSubDelayMs + val;
+                    setDialogState(() => _topSubDelayMs = newVal);
+                    setState(() {
+                      _topSubDelayMs = newVal;
+                      _videoListener(); // Recalculate cue immediately
+                    });
+                  },
+                ),
+                const Divider(color: Colors.white24, height: 1),
+                _buildSubtitleRow(
+                  context: context,
+                  title: 'Bottom Subtitle',
+                  sub: _selectedSecondarySub,
+                  isTop: false,
+                  delayMs: _bottomSubDelayMs,
+                  onDelayChanged: (val) {
+                    final newVal = _bottomSubDelayMs + val;
+                    setDialogState(() => _bottomSubDelayMs = newVal);
+                    setState(() {
+                      _bottomSubDelayMs = newVal;
+                      _videoListener(); // Recalculate cue immediately
+                    });
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              title: const Text('Top Subtitle', style: TextStyle(color: Colors.white)),
-              subtitle: Text(_selectedSub?.label ?? 'Off', style: const TextStyle(color: Colors.white54)),
-              trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
-              onTap: () {
-                Navigator.pop(context);
-                _showLanguageListDialog(context, true);
-              },
-            ),
-            ListTile(
-              title: const Text('Bottom Subtitle', style: TextStyle(color: Colors.white)),
-              subtitle: Text(_selectedSecondarySub?.label ?? 'Off', style: const TextStyle(color: Colors.white54)),
-              trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
-              onTap: () {
-                Navigator.pop(context);
-                _showLanguageListDialog(context, false);
-              },
-            ),
-          ],
-        ),
+          );
+        }
       ),
     );
   }
 
-  void _showLanguageListDialog(BuildContext context, bool isTop) {
-    // Determine available subtitles and inject "Vietnamese (Translate)" if missing
-    List<SubtitleTrack> availableSubs = List.from(widget.streamInfo.subtitles);
-    bool hasViet = availableSubs.any((s) => s.label.toLowerCase().contains('viet') || s.label.toLowerCase().contains('việt'));
+  Widget _buildSubtitleRow({
+    required BuildContext context,
+    required String title, 
+    required SubtitleTrack? sub, 
+    required bool isTop,
+    required int delayMs, 
+    required ValueChanged<int> onDelayChanged
+  }) {
+    final delayText = delayMs > 0 ? '+$delayMs ms' : (delayMs < 0 ? '$delayMs ms' : '0 ms');
     
-    if (!hasViet) {
-      availableSubs.add(const SubtitleTrack(
-        id: -1, 
-        label: 'Vietnamese (Translate)', 
-        src: 'translate_vi'
-      ));
+    String currentLanguage = 'Off';
+    int maxTracks = 0;
+    int trackIndex = 0;
+    
+    bool isTranslating = false;
+    String sourceLangStr = '';
+    
+    if (sub != null) {
+       currentLanguage = _getBaseLanguage(sub);
+       if (sub.src.startsWith('translate_')) {
+          isTranslating = true;
+          maxTracks = 1;
+          
+          final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
+          final srcLang = getIt<SharedPreferences>().getString('${prefPrefix}_trans_lang') ?? 'English';
+          final srcTrackIdx = getIt<SharedPreferences>().getInt('${prefPrefix}_trans_track') ?? 0;
+          
+          sourceLangStr = '${srcLang[0].toUpperCase()}${srcLang.substring(1)} - Track ${srcTrackIdx + 1}';
+       } else {
+         final tracksForLang = _availableSubtitles.where((s) => _getBaseLanguage(s) == currentLanguage).toList();
+         maxTracks = tracksForLang.length;
+         trackIndex = tracksForLang.indexWhere((s) => s.id == sub.id);
+         if (trackIndex == -1) trackIndex = 0;
+       }
     }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: ListTile(
+              title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 13)),
+              subtitle: Text(currentLanguage, style: const TextStyle(color: Colors.white70)),
+              onTap: () {
+                Navigator.pop(context);
+                _showLanguageSelector(context, isTop);
+              },
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: (sub != null && maxTracks > 0) 
+              ? ListTile(
+                  title: Text(isTranslating ? 'Source' : 'Track', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  subtitle: Text(isTranslating ? sourceLangStr : 'Track ${trackIndex + 1}', style: const TextStyle(color: Colors.white70)),
+                  onTap: (isTranslating || maxTracks > 1) 
+                      ? () {
+                          Navigator.pop(context);
+                          if (isTranslating) {
+                             _showTranslateSourceSelector(context, isTop, sub);
+                          } else {
+                             _showTrackSelector(context, isTop, currentLanguage);
+                          }
+                        }
+                      : null,
+                )
+              : const SizedBox.shrink(),
+          ),
+            
+          if (sub != null)
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove, color: Colors.white),
+                  onPressed: () => onDelayChanged(-100),
+                  tooltip: '-100ms',
+                ),
+                Text(delayText, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  onPressed: () => onDelayChanged(100),
+                  tooltip: '+100ms',
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 
+  void _showLanguageSelector(BuildContext context, bool isTop) {
+    final uniqueLanguages = <String>{};
+    for (var s in _availableSubtitles) {
+       uniqueLanguages.add(_getBaseLanguage(s));
+    }
+    
+    final langList = uniqueLanguages.toList();
+    langList.add('Vietnamese (Translate)');
+    langList.add('English (Translate)');
+    
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -808,21 +1030,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: ListView.builder(
             shrinkWrap: true,
-            itemCount: availableSubs.length + 1,
+            itemCount: langList.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
                 return ListTile(
                   title: const Text('Off', style: TextStyle(color: Colors.white)),
                   onTap: () {
+                    final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
+                    getIt<SharedPreferences>().setString('${prefPrefix}_lang', 'off');
                     setState(() {
                       if (isTop) {
                         _selectedSub = null;
                         _primaryCues = [];
-                        getIt<SharedPreferences>().setString('pref_sub_top', 'off');
                       } else {
                         _selectedSecondarySub = null;
                         _secondaryCues = [];
-                        getIt<SharedPreferences>().setString('pref_sub_bottom', 'off');
                       }
                     });
                     Navigator.pop(context);
@@ -830,19 +1052,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 );
               }
               
-              final sub = availableSubs[index - 1];
+              final lang = langList[index - 1];
               return ListTile(
-                title: Text(sub.label, style: const TextStyle(color: Colors.white)),
+                title: Text(lang, style: const TextStyle(color: Colors.white)),
                 onTap: () {
-                  final subLabel = sub.src == 'translate_vi' ? 'translate_vi' : sub.label.toLowerCase();
-                  getIt<SharedPreferences>().setString(isTop ? 'pref_sub_top' : 'pref_sub_bottom', subLabel);
-                  
-                  if (sub.src == 'translate_vi') {
-                    _translateSubtitles(sub, isTop);
-                  } else {
-                    _fetchSubtitles(sub, isTop);
-                  }
-                  Navigator.pop(context);
+                   Navigator.pop(context);
+                   if (lang.contains('(Translate)')) {
+                      final target = lang.startsWith('Vietnamese') ? 'vi' : 'en';
+                      final tSub = SubtitleTrack(id: -1, label: lang, src: 'translate_$target');
+                      _applySubtitle(tSub, isTop, trackIndex: 0);
+                   } else {
+                      final tracks = _availableSubtitles.where((s) => _getBaseLanguage(s) == lang).toList();
+                      if (tracks.isNotEmpty) {
+                         _applySubtitle(tracks.first, isTop, trackIndex: 0);
+                      }
+                   }
                 },
               );
             },
@@ -852,8 +1076,93 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  void _showTrackSelector(BuildContext context, bool isTop, String language) {
+    final tracks = _availableSubtitles.where((s) => _getBaseLanguage(s) == language).toList();
+    
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: AppColors.surface,
+        child: Container(
+          width: 300,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: tracks.length,
+            itemBuilder: (context, index) {
+              final sub = tracks[index];
+              return ListTile(
+                title: Text('Track ${index + 1}', style: const TextStyle(color: Colors.white)),
+                onTap: () {
+                   Navigator.pop(context);
+                   _applySubtitle(sub, isTop, trackIndex: index);
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTranslateSourceSelector(BuildContext context, bool isTop, SubtitleTrack targetSub) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: AppColors.surface,
+        child: Container(
+          width: 300,
+          height: 400, // Fixed height since there could be many tracks
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text('Select Translation Source', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              const Divider(color: Colors.white24),
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _availableSubtitles.length,
+                  itemBuilder: (context, index) {
+                    final srcSub = _availableSubtitles[index];
+                    final baseLang = _getBaseLanguage(srcSub);
+                    
+                    final peers = _availableSubtitles.where((s) => _getBaseLanguage(s) == baseLang).toList();
+                    final localIdx = peers.indexWhere((s) => s.id == srcSub.id);
+                    
+                    return ListTile(
+                      title: Text('$baseLang - Track ${localIdx + 1}', style: const TextStyle(color: Colors.white)),
+                      onTap: () {
+                         Navigator.pop(context);
+                         final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
+                         getIt<SharedPreferences>().setString('${prefPrefix}_trans_lang', baseLang.toLowerCase());
+                         getIt<SharedPreferences>().setInt('${prefPrefix}_trans_track', localIdx);
+                         
+                         final target = targetSub.src.split('_')[1];
+                         _translateSubtitles(targetSub, isTop, targetLang: target);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEpisodesDialog(BuildContext context) {
-    final sortedEpisodes = widget.allEpisodes.toList()..sort((a, b) => a.number.compareTo(b.number));
+    final sortedEpisodes = widget.allEpisodes.toList()..sort((a, b) {
+      int seasonCompare = (a.season ?? 1).compareTo(b.season ?? 1);
+      if (seasonCompare != 0) return seasonCompare;
+      return a.number.compareTo(b.number);
+    });
+    
+    final currentIndex = sortedEpisodes.indexWhere((e) => e.id == widget.episodeId);
+    final scrollController = ScrollController(initialScrollOffset: currentIndex > 0 ? currentIndex * 56.0 : 0);
     
     return Dialog(
       backgroundColor: AppColors.surface,
@@ -869,13 +1178,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
             Expanded(
               child: ListView.builder(
+                controller: scrollController,
                 itemCount: sortedEpisodes.length,
                 itemBuilder: (context, index) {
                   final ep = sortedEpisodes[index];
-                  final isCurrent = ep.number == widget.episodeNumber;
+                  final isCurrent = ep.id == widget.episodeId;
+                  final hasMultipleSeasons = widget.allEpisodes.map((e) => e.season).toSet().length > 1;
+                  String titleStr = ep.title ?? 'Episode ${ep.number.toInt()}';
+                  if (hasMultipleSeasons && !titleStr.toUpperCase().startsWith('S${ep.season}')) {
+                    titleStr = 'S${ep.season} - $titleStr';
+                  }
+                  final displayName = titleStr;
+                      
                   return ListTile(
                     title: Text(
-                      'Tập ${ep.number.toInt()}', 
+                      displayName, 
                       style: TextStyle(
                         color: isCurrent ? AppColors.primary : Colors.white,
                         fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,

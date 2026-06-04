@@ -19,6 +19,8 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _firstFilterFocusNode = FocusNode();
+  final FocusNode _firstMovieFocusNode = FocusNode();
   bool _showFilters = false; // Hide filters by default to save space
 
   @override
@@ -46,6 +48,8 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _searchFocusNode.dispose();
+    _firstFilterFocusNode.dispose();
+    _firstMovieFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -54,9 +58,25 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => getIt<SearchCubit>()..initSearch(),
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
+      child: PopScope(
+        canPop: !_showFilters,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (_showFilters) {
+            setState(() {
+              _showFilters = false;
+            });
+            if (_firstMovieFocusNode.canRequestFocus) {
+              _firstMovieFocusNode.requestFocus();
+            } else {
+              // Fallback to search node if there are no movies
+              _searchFocusNode.requestFocus();
+            }
+          }
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
           child: BlocBuilder<SearchCubit, SearchState>(
             builder: (context, state) {
               FilterConfig? config;
@@ -83,8 +103,22 @@ class _SearchScreenState extends State<SearchScreen> {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16.0, 24.0, 24.0, 16.0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                      child: Focus(
+                        canRequestFocus: false,
+                        onKeyEvent: (node, event) {
+                          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                            if (_showFilters && _firstFilterFocusNode.canRequestFocus) {
+                              _firstFilterFocusNode.requestFocus();
+                              return KeyEventResult.handled;
+                            } else if (!_showFilters && _firstMovieFocusNode.canRequestFocus) {
+                              _firstMovieFocusNode.requestFocus();
+                              return KeyEventResult.handled;
+                            }
+                          }
+                          return KeyEventResult.ignored;
+                        },
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Builder(
                             builder: (context) {
@@ -139,7 +173,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               child: TextField(
                                 focusNode: _searchFocusNode,
                                 controller: _searchController,
-                                autofocus: true,
+                                autofocus: false,
                                 style: const TextStyle(color: Colors.white, fontSize: 18),
                                 textAlignVertical: TextAlignVertical.center,
                                 decoration: InputDecoration(
@@ -217,6 +251,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                   ),
+                ),
 
                   // Filter Sections
                   if (config != null && _showFilters)
@@ -244,6 +279,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                       child: StatefulBuilder(
                                         builder: (context, setState) {
                                           return Focus(
+                                            focusNode: (config!.fields.indexOf(field) == 0 && optIndex == 0) ? _firstFilterFocusNode : null,
                                             onFocusChange: (focused) => setState(() => isFocused = focused),
                                             onKeyEvent: (node, event) {
                                               if (event is KeyDownEvent &&
@@ -337,6 +373,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               key: ValueKey('search_${movies[index].id}'),
                               movie: movies[index],
                               autoFocus: index == 0,
+                              focusNode: index == 0 ? _firstMovieFocusNode : null,
                               onFocused: () {
                                 // Trigger loadMore when focusing on one of the last 10 items
                                 if (index >= movies.length - 10) {
@@ -360,6 +397,7 @@ class _SearchScreenState extends State<SearchScreen> {
             },
           ),
         ),
+      ),
       ),
     );
   }

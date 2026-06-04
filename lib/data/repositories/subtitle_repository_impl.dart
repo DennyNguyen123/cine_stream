@@ -1,6 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import '../../domain/repositories/subtitle_repository.dart';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -64,3 +64,4 @@ class SubtitleRepositoryImpl implements SubtitleRepository {
     return md5.convert(utf8.encode(input)).toString();
   }
 }
+

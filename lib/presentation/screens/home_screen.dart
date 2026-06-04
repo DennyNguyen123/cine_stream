@@ -84,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: AnimatedContainer(
                                         duration: const Duration(milliseconds: 200),
                                         transform: Matrix4.diagonal3Values(isFocused ? 1.05 : 1.0, isFocused ? 1.05 : 1.0, 1.0),
+                                        transformAlignment: Alignment.center,
                                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                         decoration: BoxDecoration(
                                           color: isFocused ? AppColors.primary : Colors.black45,
@@ -192,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         }
                         return const Padding(
                           padding: EdgeInsets.all(58.0),
-                          child: Text('Bạn chưa xem phim nào. Hãy dùng nút Tìm kiếm ở trên nhé!', style: TextStyle(color: Colors.white54, fontSize: 18)),
+                          child: Text('You haven\'t watched any movies yet. Use the Search button above!', style: TextStyle(color: Colors.white54, fontSize: 18)),
                         );
                       },
                     ),
@@ -218,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 58.0),
           child: Text(
-            'Tiếp tục xem',
+            'Continue Watching',
             style: TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -227,24 +228,46 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 160,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 50.0),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: _HistoryCard(
-                  key: ValueKey('history_${item.movieId}'),
-                  item: item,
-                  autoFocus: index == 0,
-                ),
-              );
-            },
-          ),
+        Builder(
+          builder: (context) {
+            final scrollController = ScrollController();
+            return SizedBox(
+              height: 180, // Increased to accommodate scaling and shadow
+              child: ListView.builder(
+                controller: scrollController,
+                clipBehavior: Clip.none,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 50.0, vertical: 10.0),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: _HistoryCard(
+                      key: ValueKey('history_${item.movieId}'),
+                      item: item,
+                      autoFocus: index == 0,
+                      onFocus: () {
+                        if (index == 0) {
+                          scrollController.animateTo(
+                            0,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        } else if (index == items.length - 1) {
+                          scrollController.animateTo(
+                            scrollController.position.maxScrollExtent,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      },
+                    ),
+                  );
+                },
+              ),
+            );
+          }
         ),
       ],
     );
@@ -258,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Chọn Nguồn Phim', style: TextStyle(color: Colors.white)),
+        title: const Text('Select Source', style: TextStyle(color: Colors.white)),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.builder(
@@ -268,6 +291,8 @@ class _HomeScreenState extends State<HomeScreen> {
               final source = sources[index];
               final isSelected = sourceManager.activeSourceId == source['id'];
               return ListTile(
+                autofocus: isSelected,
+                focusColor: Colors.white24,
                 title: Text(source['name'] ?? '', style: const TextStyle(color: Colors.white)),
                 trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
                 tileColor: isSelected ? Colors.white12 : Colors.transparent,
@@ -276,11 +301,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (!isSelected) {
                     await sourceManager.setActiveSource(source['id']!);
                     // Reload Data
-                    if (mounted) {
+                    if (!context.mounted) return; {
                       context.read<HomeCubit>().loadData();
                       context.read<HistoryCubit>().loadHistory();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Đã đổi sang nguồn: ${source['name']}')),
+                        SnackBar(content: Text('Changed source to: ${source['name']}')),
                       );
                     }
                   }
@@ -297,8 +322,9 @@ class _HomeScreenState extends State<HomeScreen> {
 class _HistoryCard extends StatefulWidget {
   final HistoryItem item;
   final bool autoFocus;
+  final VoidCallback? onFocus;
 
-  const _HistoryCard({super.key, required this.item, this.autoFocus = false});
+  const _HistoryCard({super.key, required this.item, this.autoFocus = false, this.onFocus});
 
   @override
   State<_HistoryCard> createState() => _HistoryCardState();
@@ -319,7 +345,12 @@ class _HistoryCardState extends State<_HistoryCard> {
   Widget build(BuildContext context) {
     return Focus(
       autofocus: widget.autoFocus,
-      onFocusChange: (focused) => setState(() => _isFocused = focused),
+      onFocusChange: (focused) {
+        setState(() => _isFocused = focused);
+        if (focused && widget.onFocus != null) {
+          widget.onFocus!();
+        }
+      },
       onKeyEvent: (node, event) {
         if (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter) {
           if (event is KeyDownEvent) {
@@ -344,6 +375,7 @@ class _HistoryCardState extends State<_HistoryCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           transform: Matrix4.diagonal3Values(_isFocused ? 1.05 : 1.0, _isFocused ? 1.05 : 1.0, 1.0),
+          transformAlignment: Alignment.center,
           width: 250,
           decoration: BoxDecoration(
             color: AppColors.surface,
@@ -410,7 +442,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Tập ${widget.item.episodeNumber.toInt()}',
+                      'Episode ${widget.item.episodeNumber.toInt()}',
                       style: const TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ],
@@ -449,11 +481,11 @@ class _HistoryCardState extends State<_HistoryCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Xóa lịch sử?', style: TextStyle(color: Colors.white)),
-        content: Text('Bạn có chắc muốn xóa "${widget.item.movieTitle} - Tập ${widget.item.episodeNumber.toInt()}" khỏi lịch sử xem?', style: const TextStyle(color: Colors.white70)),
+        title: const Text('Delete History?', style: TextStyle(color: Colors.white)),
+        content: Text('Are you sure you want to remove "${widget.item.movieTitle} - Episode ${widget.item.episodeNumber.toInt()}" from your watch history?', style: const TextStyle(color: Colors.white70)),
         actions: [
           _TvDialogButton(
-            text: 'Hủy',
+            text: 'Cancel',
             autoFocus: true,
             onPressed: () {
               if (!canDismiss) return;
@@ -463,7 +495,7 @@ class _HistoryCardState extends State<_HistoryCard> {
           ),
           const SizedBox(width: 16),
           _TvDialogButton(
-            text: 'Xóa',
+            text: 'Delete',
             onPressed: () {
               if (!canDismiss) return;
               final cubit = context.read<HistoryCubit>();
@@ -515,6 +547,7 @@ class _TvDialogButtonState extends State<_TvDialogButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           transform: Matrix4.diagonal3Values(_isFocused ? 1.05 : 1.0, _isFocused ? 1.05 : 1.0, 1.0),
+          transformAlignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           decoration: BoxDecoration(
             color: widget.isPrimary ? AppColors.primary : Colors.transparent,

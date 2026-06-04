@@ -1,5 +1,5 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 
 class TranslationService {
   final Dio _dio;
@@ -12,10 +12,10 @@ class TranslationService {
     if (texts.isEmpty) return [];
 
     try {
-      // Nối các câu lại bằng ký tự đặc biệt để dịch 1 lần (tiết kiệm request)
-      // Google Translate hỗ trợ khoảng ~5000 ký tự mỗi request
-      final separator = ' | ';
-      final combinedText = texts.join(separator);
+      // Thay thế \n bằng thẻ <br> để tránh nhầm lẫn với dấu ngắt câu của batch
+      final preparedTexts = texts.map((t) => t.replaceAll('\n', '<br>')).toList();
+      final separator = '\n\n';
+      final combinedText = preparedTexts.join(separator);
 
       final response = await _dio.get(
         _baseUrl,
@@ -38,10 +38,10 @@ class TranslationService {
         }
 
         // Tách lại thành các câu
-        List<String> results = fullTranslatedText.toString().split(separator);
+        List<String> results = fullTranslatedText.toString().split(RegExp(r'\n+'));
         
-        // Trim và chuẩn hóa lại (nếu Google dịch làm mất format spacer)
-        return results.map((e) => e.trim()).toList();
+        // Trim và khôi phục lại thẻ <br> thành \n
+        return results.map((e) => e.replaceAll(RegExp(r'<\s*br\s*>|<\s*/\s*br\s*>|&lt;br&gt;', caseSensitive: false), '\n').trim()).toList();
       }
       return texts; // Fallback to original
     } catch (e) {
@@ -50,3 +50,4 @@ class TranslationService {
     }
   }
 }
+

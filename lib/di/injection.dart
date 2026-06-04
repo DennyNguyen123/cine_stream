@@ -6,9 +6,12 @@ import '../data/repositories/history_repository.dart';
 
 import '../data/repositories/subtitle_repository_impl.dart';
 import '../data/repositories/translation_service.dart';
+import '../data/repositories/external_subtitle_repository.dart';
 import '../data/sources/kisskh/kisskh_api.dart';
 import '../data/sources/kisskh/kisskh_source.dart';
 import '../data/sources/cinemeta/cinemeta_source.dart';
+import '../data/sources/phimmoichill/phimmoichill_api.dart';
+import '../data/sources/phimmoichill/phimmoichill_source.dart';
 
 import '../domain/repositories/movie_source.dart';
 import '../domain/repositories/source_manager.dart';
@@ -32,20 +35,24 @@ Future<void> setupInjection() async {
   getIt.registerLazySingleton<SharedPreferences>(() => prefs);
   getIt.registerLazySingleton<HistoryRepository>(() => HistoryRepositoryImpl(getIt()));
   getIt.registerLazySingleton<SubtitleRepository>(() => SubtitleRepositoryImpl(getIt()));
+  getIt.registerLazySingleton<ExternalSubtitleRepository>(() => ExternalSubtitleRepository(getIt()));
   getIt.registerLazySingleton<TranslationService>(() => TranslationService(getIt()));
   
   // Sources
   getIt.registerLazySingleton(() => KissKhApi(getIt()));
+  getIt.registerLazySingleton(() => PhimMoiChillApi(getIt()));
   
   final kissKhSource = KissKhSource(getIt());
   final cinemetaSource = CinemetaSource(getIt());
+  final phimMoiChillSource = PhimMoiChillSource(getIt());
 
 
   final sourceManager = SourceManager(
     prefs: prefs,
     sources: {
-      'kisskh': kissKhSource,
       'cinemeta': cinemetaSource,
+      'phimmoichill': phimMoiChillSource,
+      'kisskh': kissKhSource,
     },
     defaultSourceId: 'cinemeta',
   );
