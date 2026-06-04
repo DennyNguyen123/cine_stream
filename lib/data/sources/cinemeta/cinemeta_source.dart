@@ -9,6 +9,7 @@ import '../../../domain/entities/episode.dart';
 import 'extractors/vidnest_extractor.dart';
 import 'extractors/vidplay_extractor.dart';
 import 'extractors/vdrk_subtitle_extractor.dart';
+import 'extractors/vidsrcme_extractor.dart';
 import '../../../domain/entities/subtitle.dart';
 
 class CinemetaSource implements MovieSource {
@@ -190,7 +191,8 @@ class CinemetaSource implements MovieSource {
         episodes: episodes,
         servers: [
           VideoServer(id: 'vnest', name: 'Vidnest'),
-          VideoServer(id: 'vpls', name: 'Vidplay')
+          VideoServer(id: 'vpls', name: 'Vidplay'),
+          VideoServer(id: 'vidsrcme', name: 'Vidsrcme')
         ],
       );
     } catch (e) {
@@ -248,12 +250,18 @@ class CinemetaSource implements MovieSource {
             servers.add(VideoServer(id: src, name: serverName));
           }
         }
+        
+        servers.add(VideoServer(id: 'vidsrcme', name: 'Vidsrcme'));
 
         // Determine target server URL
         if (serverId != null && serverId.isNotEmpty) {
-          final found = servers.where((s) => s.id.contains(serverId)).toList();
-          if (found.isNotEmpty) {
-            targetServerUrl = found.first.id;
+          if (serverId == 'vidsrcme') {
+            targetServerUrl = 'vidsrcme';
+          } else {
+            final found = servers.where((s) => s.id.contains(serverId)).toList();
+            if (found.isNotEmpty) {
+              targetServerUrl = found.first.id;
+            }
           }
         } 
         
@@ -292,7 +300,15 @@ class CinemetaSource implements MovieSource {
 
       StreamInfo? streamInfo;
       
-      if (targetServerUrl.contains('vnest')) {
+      if (targetServerUrl == 'vidsrcme') {
+        String vidsrcUrl;
+        if (isTv) {
+          vidsrcUrl = 'https://vidsrcme.ru/embed/tv?imdb=$imdbId&season=${episodeId.split('/')[2]}&episode=${episodeId.split('/')[3]}&autoplay=1';
+        } else {
+          vidsrcUrl = 'https://vidsrcme.ru/embed/movie?imdb=$imdbId&autoplay=1';
+        }
+        streamInfo = await VidsrcmeExtractor.extractStream(vidsrcUrl, subtitles);
+      } else if (targetServerUrl.contains('vnest')) {
         streamInfo = await VidnestExtractor.extractStream(targetServerUrl, subtitles);
       } else if (targetServerUrl.contains('vpls')) {
         streamInfo = await VidplayExtractor.extractStream(targetServerUrl, subtitles);
