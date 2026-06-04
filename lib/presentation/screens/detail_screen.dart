@@ -36,10 +36,108 @@ class _DetailScreenState extends State<DetailScreen> {
   bool _isPaginationInitialized = false;
   static const int _episodesPerPage = 50;
 
+  late final FocusNode _playButtonNode;
+  late final FocusNode _firstServerNode;
+  late final FocusNode _firstSeasonNode;
+  late final FocusNode _firstPageNode;
+  late final FocusNode _firstEpisodeNode;
+
   @override
   void initState() {
     super.initState();
+    _playButtonNode = FocusNode();
+    _firstServerNode = FocusNode();
+    _firstSeasonNode = FocusNode();
+    _firstPageNode = FocusNode();
+    _firstEpisodeNode = FocusNode();
     _loadHistory();
+  }
+
+  @override
+  void dispose() {
+    _playButtonNode.dispose();
+    _firstServerNode.dispose();
+    _firstSeasonNode.dispose();
+    _firstPageNode.dispose();
+    _firstEpisodeNode.dispose();
+    super.dispose();
+  }
+
+  List<FocusNode> _getAvailableRowNodes(MovieDetail detail) {
+    List<FocusNode> nodes = [_playButtonNode];
+    if (detail.servers.isNotEmpty) nodes.add(_firstServerNode);
+    
+    final seasons = detail.episodes.map((e) => e.season).toSet().toList();
+    if (seasons.length > 1) nodes.add(_firstSeasonNode);
+    
+    final selectedSeason = _selectedSeason ?? (seasons.isNotEmpty ? seasons.first : null);
+    if (selectedSeason != null) {
+      final seasonEpisodes = detail.episodes.where((e) => e.season == selectedSeason).toList();
+      final int totalPages = (seasonEpisodes.length / _episodesPerPage).ceil();
+      if (totalPages > 1) nodes.add(_firstPageNode);
+    }
+    
+    if (detail.episodes.isNotEmpty) nodes.add(_firstEpisodeNode);
+    
+    return nodes;
+  }
+
+  FocusNode? _getNodeBelow(FocusNode currentRowNode, MovieDetail detail) {
+    final nodes = _getAvailableRowNodes(detail);
+    int index = nodes.indexOf(currentRowNode);
+    if (index != -1 && index < nodes.length - 1) {
+      return nodes[index + 1];
+    }
+    return null;
+  }
+
+  FocusNode? _getNodeAbove(FocusNode currentRowNode, MovieDetail detail) {
+    final nodes = _getAvailableRowNodes(detail);
+    int index = nodes.indexOf(currentRowNode);
+    if (index > 0) {
+      return nodes[index - 1];
+    }
+    return null;
+  }
+
+  KeyEventResult _handleRowFocus(
+    FocusNode currentRowNode,
+    KeyDownEvent event,
+    MovieDetail detail,
+    VoidCallback onSelect,
+  ) {
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      final target = _getNodeBelow(currentRowNode, detail);
+      if (target != null) {
+        target.requestFocus();
+        if (target.context != null) {
+          Scrollable.ensureVisible(
+            target.context!,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+        return KeyEventResult.handled;
+      }
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      final target = _getNodeAbove(currentRowNode, detail);
+      if (target != null) {
+        target.requestFocus();
+        if (target.context != null) {
+          Scrollable.ensureVisible(
+            target.context!,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+        return KeyEventResult.handled;
+      }
+    } else if (event.logicalKey == LogicalKeyboardKey.select ||
+        event.logicalKey == LogicalKeyboardKey.enter) {
+      onSelect();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Future<void> _loadHistory() async {
@@ -324,17 +422,18 @@ class _DetailScreenState extends State<DetailScreen> {
                                 return StatefulBuilder(
                                   builder: (context, setState) {
                                     return Focus(
+                                      focusNode: _playButtonNode,
                                       autofocus: true,
                                       onFocusChange: (focused) =>
                                           setState(() => isFocused = focused),
                                       onKeyEvent: (node, event) {
-                                        if (event is KeyDownEvent &&
-                                            (event.logicalKey ==
-                                                    LogicalKeyboardKey.select ||
-                                                event.logicalKey ==
-                                                    LogicalKeyboardKey.enter)) {
-                                          _handlePlayNow(context, detail);
-                                          return KeyEventResult.handled;
+                                        if (event is KeyDownEvent) {
+                                          return _handleRowFocus(
+                                            _playButtonNode,
+                                            event,
+                                            detail,
+                                            () => _handlePlayNow(context, detail),
+                                          );
                                         }
                                         return KeyEventResult.ignored;
                                       },
@@ -438,24 +537,23 @@ class _DetailScreenState extends State<DetailScreen> {
                                           return StatefulBuilder(
                                             builder: (context, setFocusState) {
                                               return Focus(
+                                                focusNode: index == 0 ? _firstServerNode : null,
                                                 onFocusChange: (focused) =>
                                                     setFocusState(
                                                       () => isFocused = focused,
                                                     ),
                                                 onKeyEvent: (node, event) {
-                                                  if (event is KeyDownEvent &&
-                                                      (event.logicalKey ==
-                                                              LogicalKeyboardKey
-                                                                  .select ||
-                                                          event.logicalKey ==
-                                                              LogicalKeyboardKey
-                                                                  .enter)) {
-                                                    setState(() {
-                                                      _selectedServerId =
-                                                          server.id;
-                                                    });
-                                                    return KeyEventResult
-                                                        .handled;
+                                                  if (event is KeyDownEvent) {
+                                                    return _handleRowFocus(
+                                                      _firstServerNode,
+                                                      event,
+                                                      detail,
+                                                      () {
+                                                        setState(() {
+                                                          _selectedServerId = server.id;
+                                                        });
+                                                      },
+                                                    );
                                                   }
                                                   return KeyEventResult.ignored;
                                                 },
@@ -612,6 +710,23 @@ class _DetailScreenState extends State<DetailScreen> {
                                                 child: _buildFilterChip(
                                                   text: 'Season $season',
                                                   isSelected: isSelected,
+                                                  focusNode: index == 0 ? _firstSeasonNode : null,
+                                                  onKeyEvent: (node, event) {
+                                                    if (event is KeyDownEvent) {
+                                                      return _handleRowFocus(
+                                                        _firstSeasonNode,
+                                                        event,
+                                                        detail,
+                                                        () {
+                                                          setState(() {
+                                                            _selectedSeason = season;
+                                                            _selectedPage = 0;
+                                                          });
+                                                        },
+                                                      );
+                                                    }
+                                                    return KeyEventResult.ignored;
+                                                  },
                                                   onTap: () {
                                                     setState(() {
                                                       _selectedSeason = season;
@@ -647,6 +762,22 @@ class _DetailScreenState extends State<DetailScreen> {
                                                 child: _buildFilterChip(
                                                   text: 'Episodes $startEpNum - $endEpNum',
                                                   isSelected: isSelected,
+                                                  focusNode: index == 0 ? _firstPageNode : null,
+                                                  onKeyEvent: (node, event) {
+                                                    if (event is KeyDownEvent) {
+                                                      return _handleRowFocus(
+                                                        _firstPageNode,
+                                                        event,
+                                                        detail,
+                                                        () {
+                                                          setState(() {
+                                                            _selectedPage = index;
+                                                          });
+                                                        },
+                                                      );
+                                                    }
+                                                    return KeyEventResult.ignored;
+                                                  },
                                                   onTap: () {
                                                     setState(() {
                                                       _selectedPage = index;
@@ -670,7 +801,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                             final ep = pageEpisodes[index];
                                             return _buildEpisodeItem(
                                               ep,
-                                              detail.episodes,
+                                              detail,
                                               isFirst: index == 0,
                                             );
                                           },
@@ -830,7 +961,8 @@ class _DetailScreenState extends State<DetailScreen> {
     }
   }
 
-  Widget _buildEpisodeItem(Episode ep, List<Episode> allEpisodes, {bool isFirst = false}) {
+  Widget _buildEpisodeItem(Episode ep, MovieDetail detail, {bool isFirst = false}) {
+    final allEpisodes = detail.episodes;
     return Padding(
       padding: const EdgeInsets.only(right: 16.0),
       child: Builder(
@@ -839,27 +971,32 @@ class _DetailScreenState extends State<DetailScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return Focus(
+                focusNode: isFirst ? _firstEpisodeNode : null,
                 autofocus: _historyItem == null && isFirst,
                 key: ValueKey('episode_${ep.number}'),
                 onFocusChange: (focused) => setState(() => isFocused = focused),
                 onKeyEvent: (node, event) {
-                  if (event is KeyDownEvent &&
-                      (event.logicalKey == LogicalKeyboardKey.select ||
-                          event.logicalKey == LogicalKeyboardKey.enter)) {
-                    final hasMultipleSeasons = allEpisodes.map((e) => e.season).toSet().length > 1;
-                    final title = hasMultipleSeasons 
-                        ? 'S${ep.season} - ${ep.title ?? 'Episode ${ep.number.toInt()}'}'
-                        : (ep.title ?? '${widget.movie.title} - Episode ${ep.number.toInt()}');
-                    _playEpisode(
-                      context: context,
-                      movieId: widget.movie.id,
-                      episodeId: ep.id,
-                      title: title,
-                      episodeNumber: ep.number,
-                      allEpisodes: allEpisodes,
-                      serverId: _selectedServerId,
+                  if (event is KeyDownEvent) {
+                    return _handleRowFocus(
+                      _firstEpisodeNode,
+                      event,
+                      detail,
+                      () {
+                        final hasMultipleSeasons = allEpisodes.map((e) => e.season).toSet().length > 1;
+                        final title = hasMultipleSeasons 
+                            ? 'S${ep.season} - ${ep.title ?? 'Episode ${ep.number.toInt()}'}'
+                            : (ep.title ?? '${widget.movie.title} - Episode ${ep.number.toInt()}');
+                        _playEpisode(
+                          context: context,
+                          movieId: widget.movie.id,
+                          episodeId: ep.id,
+                          title: title,
+                          episodeNumber: ep.number,
+                          allEpisodes: allEpisodes,
+                          serverId: _selectedServerId,
+                        );
+                      },
                     );
-                    return KeyEventResult.handled;
                   }
                   return KeyEventResult.ignored;
                 },
@@ -959,15 +1096,22 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _buildFilterChip({required String text, required bool isSelected, required VoidCallback onTap}) {
+  Widget _buildFilterChip({
+    required String text,
+    required bool isSelected,
+    required VoidCallback onTap,
+    FocusNode? focusNode,
+    FocusOnKeyEventCallback? onKeyEvent,
+  }) {
     return Builder(
       builder: (context) {
         bool isFocused = false;
         return StatefulBuilder(
           builder: (context, setFocusState) {
             return Focus(
+              focusNode: focusNode,
               onFocusChange: (focused) => setFocusState(() => isFocused = focused),
-              onKeyEvent: (node, event) {
+              onKeyEvent: onKeyEvent ?? (node, event) {
                 if (event is KeyDownEvent &&
                     (event.logicalKey == LogicalKeyboardKey.select ||
                         event.logicalKey == LogicalKeyboardKey.enter)) {
