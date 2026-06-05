@@ -16,6 +16,10 @@ void main() async {
     DeviceOrientation.landscapeLeft,
   ]);
 
+  // Tối ưu RAM cho Android TV (giảm cache ảnh để tránh OOM)
+  PaintingBinding.instance.imageCache.maximumSize = 200; // Mặc định là 1000 ảnh
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 50 << 20; // 50 MB (Mặc định là 100 MB)
+
   runApp(const CineStreamApp());
 }
 

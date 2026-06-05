@@ -314,12 +314,23 @@ class CinemetaSource implements MovieSource {
         streamInfo = await VidplayExtractor.extractStream(targetServerUrl, subtitles);
       }
 
+      String? resolvedServerId = serverId;
+      if (resolvedServerId == null || resolvedServerId.isEmpty) {
+        if (targetServerUrl.contains('vnest')) {
+          resolvedServerId = 'vnest';
+        } else if (targetServerUrl.contains('vpls')) {
+          resolvedServerId = 'vpls';
+        } else if (targetServerUrl == 'vidsrcme') {
+          resolvedServerId = 'vidsrcme';
+        }
+      }
+
       if (streamInfo != null) {
         return StreamInfo(
           videoUrl: streamInfo.videoUrl,
           subtitles: streamInfo.subtitles,
           servers: servers,
-          currentServerId: targetServerUrl,
+          currentServerId: resolvedServerId,
           headers: streamInfo.headers,
         );
       }

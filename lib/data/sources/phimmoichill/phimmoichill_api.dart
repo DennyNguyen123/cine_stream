@@ -115,15 +115,20 @@ class PhimMoiChillApi {
 
       List<Map<String, String>> episodes = [];
       List<Map<String, dynamic>> servers = [];
-      
+
       // Fetch Next.js watch page to get episodes & servers
       try {
-        final watchRes = await _dio.get('$_baseUrl/xem-phim/$slug/tap-1/vietsub');
+        final watchRes = await _dio.get(
+          '$_baseUrl/xem-phim/$slug/tap-1/vietsub',
+        );
         final watchHtml = watchRes.data.toString();
-        
-        final scriptRegex = RegExp(r'<script>self\.__next_f\.push\(\[1,"(.*)"\]\)</script>', dotAll: true);
+
+        final scriptRegex = RegExp(
+          r'<script>self\.__next_f\.push\(\[1,"(.*)"\]\)</script>',
+          dotAll: true,
+        );
         final scriptMatches = scriptRegex.allMatches(watchHtml);
-        
+
         String fullPayload = '';
         for (var m in scriptMatches) {
           String str = m.group(1)!;
@@ -167,9 +172,14 @@ class PhimMoiChillApi {
         for (final m in matches) {
           String title = m.group(1) ?? m.group(4) ?? '';
           String href = m.group(2) ?? m.group(3) ?? '';
-          if (href.isNotEmpty && !seenUrls.contains(href)) {
-            seenUrls.add(href);
-            if (title.contains('-')) {
+          if (href.isNotEmpty) {
+            href = href.split('?').first;
+            if (href.endsWith('/vietsub')) href = href.substring(0, href.length - 8);
+            if (href.endsWith('/thuyet-minh')) href = href.substring(0, href.length - 12);
+            
+            if (!seenUrls.contains(href)) {
+              seenUrls.add(href);
+              if (title.contains('-')) {
               title = title.split('-').first.trim();
             }
             if (title.isEmpty) {
@@ -178,7 +188,8 @@ class PhimMoiChillApi {
                 title = uri.pathSegments[2].replaceAll('-', ' ').toUpperCase();
               }
             }
-            episodes.add({'title': title, 'url': href});
+              episodes.add({'title': title, 'url': href});
+            }
           }
         }
       }
@@ -202,17 +213,71 @@ class PhimMoiChillApi {
       final res = await _dio.get('$_baseUrl$episodePath');
       final html = res.data.toString();
 
+      String? serverSlug;
+      if (episodePath.contains('?server=')) {
+        serverSlug = episodePath.split('?server=').last;
+      }
+
+      String? matchedEmbedUrl;
+      try {
+        final scriptRegex = RegExp(
+          r'<script>self\.__next_f\.push\(\[1,"(.*)"\]\)</script>',
+          dotAll: true,
+        );
+        final scriptMatches = scriptRegex.allMatches(html);
+        String fullPayload = '';
+        for (var m in scriptMatches) {
+          String str = m.group(1)!;
+          str = str.replaceAll(r'\"', '"');
+          str = str.replaceAll(r'\\', r'\');
+          fullPayload += str;
+        }
+        final epSourceRegex = RegExp(r'"episode_sources":(\[.*?\])');
+        final sourceMatch = epSourceRegex.firstMatch(fullPayload);
+        if (sourceMatch != null) {
+          final sourcesList = jsonDecode(sourceMatch.group(1)!) as List;
+          if (serverSlug != null) {
+            for (var src in sourcesList) {
+              if (src['server'] != null && src['server']['slug'] == serverSlug) {
+                matchedEmbedUrl = src['link']?.toString();
+                break;
+              }
+            }
+          }
+          // Fallback to first if not found
+          if (matchedEmbedUrl == null && sourcesList.isNotEmpty) {
+            matchedEmbedUrl = sourcesList[0]['link']?.toString();
+          }
+        }
+      } catch (e) {
+        debugPrint('NextJS JSON extraction error in getStreamUrl: $e');
+      }
+
+      if (matchedEmbedUrl != null && matchedEmbedUrl.isNotEmpty) {
+        String embedUrl = matchedEmbedUrl;
+        final realUrl = embedUrl.startsWith('//')
+            ? 'https:$embedUrl'
+            : embedUrl;
+        debugPrint('PhimMoiChillApi getStreamUrl (JSON): realUrl=$realUrl');
+        return realUrl;
+      }
+
       final m3u8Regex = RegExp(r'link_m3u8[\\":]+(https?[^"\\]+m3u8)');
       final match = m3u8Regex.firstMatch(html);
       if (match != null) {
         return match.group(1)!.replaceAll(r'\/', '/');
       }
 
-      final embedUrlRegex = RegExp(r'https?[^"\\]+embed[^"\\]+');
-      final embedUrlMatch = embedUrlRegex.firstMatch(html);
+      if (matchedEmbedUrl == null) {
+        final embedUrlRegex = RegExp(r'https?[^"\\]+embed[^"\\]+');
+        final embedUrlMatch = embedUrlRegex.firstMatch(html);
+        if (embedUrlMatch != null) {
+          matchedEmbedUrl = embedUrlMatch.group(0)!.replaceAll(r'\/', '/');
+        }
+      }
 
-      if (embedUrlMatch != null) {
-        String embedUrl = embedUrlMatch.group(0)!.replaceAll(r'\/', '/');
+      if (matchedEmbedUrl != null) {
+        String embedUrl = matchedEmbedUrl;
         final realUrl = embedUrl.startsWith('//')
             ? 'https:$embedUrl'
             : embedUrl;

@@ -273,6 +273,10 @@ class _SourceButtonState extends State<_SourceButton> {
                   Navigator.pop(ctx);
                   if (!isSelected) {
                     await sourceManager.setActiveSource(source['id']!);
+                    // Chủ động xoá cache ảnh cũ khi đổi nguồn để giải phóng RAM cho TV Box
+                    PaintingBinding.instance.imageCache.clear();
+                    PaintingBinding.instance.imageCache.clearLiveImages();
+                    
                     if (!context.mounted) return;
                     context.read<HomeCubit>().loadData();
                     context.read<HistoryCubit>().loadHistory();

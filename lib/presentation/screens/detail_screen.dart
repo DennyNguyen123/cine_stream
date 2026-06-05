@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/movie.dart';
 import '../../domain/entities/movie_detail.dart';
 import '../../domain/entities/episode.dart';
+import '../../domain/entities/stream_info.dart';
 import '../../domain/entities/history_item.dart';
 import '../../data/repositories/history_repository.dart';
 import '../../core/theme/app_colors.dart';
@@ -248,6 +249,7 @@ class _DetailScreenState extends State<DetailScreen> {
                           child: CachedNetworkImage(
                             imageUrl: detail.thumbnail!,
                             fit: BoxFit.cover,
+                            memCacheWidth: 600,
                           ),
                         ),
                       ),
@@ -881,7 +883,8 @@ class _DetailScreenState extends State<DetailScreen> {
               episodeNumber: history.episodeNumber,
               allEpisodes: detail.episodes,
               startPositionMs: history.positionMs,
-              serverId: _selectedServerId,
+              serverId: history.serverId ?? _selectedServerId,
+              servers: detail.servers,
             );
           } else {
             if (!context.mounted) return;
@@ -894,6 +897,7 @@ class _DetailScreenState extends State<DetailScreen> {
               episodeNumber: epNumber,
               allEpisodes: detail.episodes,
               serverId: _selectedServerId,
+              servers: detail.servers,
             );
           }
         });
@@ -908,6 +912,7 @@ class _DetailScreenState extends State<DetailScreen> {
     required List<Episode> allEpisodes,
     int startPositionMs = 0,
     String? serverId,
+    List<VideoServer>? servers,
   }) async {
     // Show loading
     showDialog(
@@ -942,12 +947,22 @@ class _DetailScreenState extends State<DetailScreen> {
               startPositionMs: startPositionMs,
               allEpisodes: allEpisodes,
               serverId: serverId,
+              servers: servers,
             ),
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not load stream info')),
+        _showStreamErrorDialog(
+          context: context,
+          movieId: movieId,
+          episodeId: episodeId,
+          title: title,
+          episodeNumber: episodeNumber,
+          allEpisodes: allEpisodes,
+          startPositionMs: startPositionMs,
+          serverId: serverId,
+          servers: servers,
+          error: 'Could not load stream info',
         );
       }
     } catch (e) {
@@ -955,10 +970,135 @@ class _DetailScreenState extends State<DetailScreen> {
 
       Navigator.pop(context);
       final errorMsg = e.toString().replaceAll('Exception: ', '');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(errorMsg)));
+      _showStreamErrorDialog(
+          context: context,
+          movieId: movieId,
+          episodeId: episodeId,
+          title: title,
+          episodeNumber: episodeNumber,
+          allEpisodes: allEpisodes,
+          startPositionMs: startPositionMs,
+          serverId: serverId,
+          servers: servers,
+          error: errorMsg,
+      );
     }
+  }
+
+  void _showStreamErrorDialog({
+    required BuildContext context,
+    required String movieId,
+    required String episodeId,
+    required String title,
+    required double episodeNumber,
+    required List<Episode> allEpisodes,
+    required int startPositionMs,
+    String? serverId,
+    List<VideoServer>? servers,
+    required String error,
+  }) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Stream Error', style: TextStyle(color: Colors.white)),
+        content: Text('Failed to load video stream.\n$error', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+          ),
+          if (servers != null && servers.isNotEmpty)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
+              onPressed: () {
+                Navigator.pop(context);
+                _buildServerDialog(
+                  context: context,
+                  servers: servers,
+                  onSelect: (selectedServerId) {
+                    _playEpisode(
+                      context: context,
+                      movieId: movieId,
+                      episodeId: episodeId,
+                      title: title,
+                      episodeNumber: episodeNumber,
+                      allEpisodes: allEpisodes,
+                      startPositionMs: startPositionMs,
+                      serverId: selectedServerId,
+                      servers: servers,
+                    );
+                  },
+                );
+              },
+              child: const Text('Change Server', style: TextStyle(color: Colors.white)),
+            ),
+          ElevatedButton(
+            autofocus: true,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () {
+              Navigator.pop(context);
+              _playEpisode(
+                context: context,
+                movieId: movieId,
+                episodeId: episodeId,
+                title: title,
+                episodeNumber: episodeNumber,
+                allEpisodes: allEpisodes,
+                startPositionMs: startPositionMs,
+                serverId: serverId,
+                servers: servers,
+              );
+            },
+            child: const Text('Retry', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _buildServerDialog({
+    required BuildContext context,
+    required List<VideoServer> servers,
+    required Function(String) onSelect,
+  }) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: AppColors.surface,
+        child: Container(
+          width: 350,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Select Server', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: servers.map((s) {
+                      return ListTile(
+                        autofocus: s == servers.first,
+                        focusColor: Colors.white24,
+                        title: Text(s.name, style: const TextStyle(color: Colors.white)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          onSelect(s.id);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildEpisodeItem(Episode ep, MovieDetail detail, {bool isFirst = false}) {
@@ -994,6 +1134,7 @@ class _DetailScreenState extends State<DetailScreen> {
                           episodeNumber: ep.number,
                           allEpisodes: allEpisodes,
                           serverId: _selectedServerId,
+                          servers: detail.servers,
                         );
                       },
                     );
@@ -1019,6 +1160,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       episodeNumber: ep.number,
                       allEpisodes: allEpisodes,
                       serverId: _selectedServerId,
+                      servers: detail.servers,
                     );
                   },
                   child: AnimatedContainer(

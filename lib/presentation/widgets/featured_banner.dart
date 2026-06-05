@@ -34,6 +34,7 @@ class FeaturedBanner extends StatelessWidget {
             CachedNetworkImage(
               imageUrl: movie!.thumbnail!,
               fit: BoxFit.cover,
+              memCacheWidth: 600,
               color: Colors.black.withValues(alpha:0.55),
               colorBlendMode: BlendMode.darken,
             ),

@@ -32,6 +32,7 @@ class PlayerScreen extends StatefulWidget {
   final int startPositionMs;
   final List<Episode> allEpisodes;
   final String? serverId;
+  final List<VideoServer>? servers;
 
   const PlayerScreen({
     super.key,
@@ -45,6 +46,7 @@ class PlayerScreen extends StatefulWidget {
     this.startPositionMs = 0,
     required this.allEpisodes,
     this.serverId,
+    this.servers,
   });
 
   @override
@@ -86,6 +88,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _autoNext = true;
   double _playbackSpeed = 1.0;
   bool _isChangingEpisode = false;
+  bool _errorDialogShowing = false;
 
   @override
   void initState() {
@@ -133,6 +136,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
         _controller.setPlaybackSpeed(_playbackSpeed);
         _controller.play();
+      }).catchError((e) {
+        if (!mounted) return;
+        _showErrorDialog("Player initialization failed:\n${e.toString()}");
       });
 
     final prefs = getIt<SharedPreferences>();
@@ -393,6 +399,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _currentSecondaryCue = activeSecondary;
     });
 
+    if (_controller.value.hasError && !_errorDialogShowing) {
+      _showErrorDialog("Video player error:\n${_controller.value.errorDescription}");
+    }
+
     if (_duration.inMilliseconds > 0 && _position >= _duration && _autoNext && !_isChangingEpisode) {
       _playNextEpisode();
     }
@@ -461,7 +471,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           titleStr = 'S${nextEp.season} - $titleStr';
         }
         String title = '${widget.movieTitle} - $titleStr';
-        if (widget.movieTitle == titleStr) { // Assuming we only have 'movieTitle' here, we don't have 'type'. But for movies, titleStr equals the movie title in most sources like cinemeta.
+        if (widget.movieTitle == titleStr) { 
           title = widget.movieTitle;
         }
         Navigator.pushReplacement(
@@ -476,17 +486,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
             episodeNumber: nextEp.number,
             startPositionMs: 0,
             allEpisodes: widget.allEpisodes,
+            serverId: widget.serverId,
+            servers: widget.servers,
           )),
         );
       } else {
         setState(() => _isChangingEpisode = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not load next episode')));
+        _showErrorDialog("Could not load stream info for the next episode.");
       }
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
       setState(() => _isChangingEpisode = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      _showErrorDialog(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
@@ -525,18 +537,71 @@ class _PlayerScreenState extends State<PlayerScreen> {
             episodeNumber: widget.episodeNumber,
             startPositionMs: _position.inMilliseconds,
             allEpisodes: widget.allEpisodes,
+            serverId: serverId,
+            servers: widget.servers,
           )),
         );
       } else {
         setState(() => _isChangingEpisode = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not load server')));
+        _showErrorDialog("Could not load stream info for the selected server.");
       }
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
       setState(() => _isChangingEpisode = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      _showErrorDialog(e.toString().replaceAll('Exception: ', ''));
     }
+  }
+
+  void _showErrorDialog(String error) {
+    if (_errorDialogShowing || !mounted) return;
+    setState(() => _errorDialogShowing = true);
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Stream Error', style: TextStyle(color: Colors.white)),
+        content: Text('Failed to load video.\n$error', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() => _errorDialogShowing = false);
+              _handleBackPress();
+            },
+            child: const Text('Exit', style: TextStyle(color: Colors.white)),
+          ),
+          if (widget.servers != null && widget.servers!.isNotEmpty)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => _errorDialogShowing = false);
+                showDialog(
+                  context: context,
+                  builder: (context) => _buildServerDialog(context),
+                );
+              },
+              child: const Text('Change Server', style: TextStyle(color: Colors.white)),
+            ),
+          ElevatedButton(
+            autofocus: true,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() => _errorDialogShowing = false);
+              // Retry current episode on current server
+              final ep = widget.allEpisodes.firstWhere((e) => e.id == widget.episodeId, orElse: () => widget.allEpisodes.first);
+              _changeEpisode(ep);
+            },
+            child: const Text('Retry', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _startControlsTimer() {
@@ -573,6 +638,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       durationMs: _duration.inMilliseconds,
       timestamp: DateTime.now().millisecondsSinceEpoch,
       sourceId: getIt<SourceManager>().activeSourceId,
+      serverId: widget.streamInfo.currentServerId ?? widget.serverId,
     ));
   }
 
@@ -1191,6 +1257,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   final displayName = titleStr;
                       
                   return ListTile(
+                    focusColor: Colors.white24,
                     title: Text(
                       displayName, 
                       style: TextStyle(
@@ -1216,7 +1283,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Widget _buildServerDialog(BuildContext context) {
-    final servers = widget.streamInfo.servers;
+    final servers = widget.servers ?? widget.streamInfo.servers;
     if (servers.isEmpty) {
        return const Dialog(
          backgroundColor: AppColors.surface,
@@ -1244,8 +1311,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: servers.map((server) {
-                    final isCurrent = server.id == widget.streamInfo.currentServerId;
+                    String? activeServerId = widget.streamInfo.currentServerId ?? widget.serverId;
+                    if (activeServerId == null && servers.isNotEmpty) {
+                      activeServerId = servers.first.id;
+                    }
+                    final isCurrent = server.id == activeServerId;
                     return ListTile(
+                      autofocus: server == servers.first,
+                      focusColor: Colors.white24,
                       title: Text(server.name, style: TextStyle(color: isCurrent ? AppColors.primary : Colors.white)),
                       trailing: isCurrent ? const Icon(Icons.check, color: AppColors.primary) : null,
                       onTap: () {

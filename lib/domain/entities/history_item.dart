@@ -10,6 +10,7 @@ class HistoryItem {
   final int durationMs;
   final int timestamp;
   final String sourceId;
+  final String? serverId;
 
   const HistoryItem({
     required this.movieId,
@@ -21,6 +22,7 @@ class HistoryItem {
     required this.durationMs,
     required this.timestamp,
     required this.sourceId,
+    this.serverId,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +36,7 @@ class HistoryItem {
       'durationMs': durationMs,
       'timestamp': timestamp,
       'sourceId': sourceId,
+      'serverId': serverId,
     };
   }
 
@@ -48,6 +51,7 @@ class HistoryItem {
       durationMs: map['durationMs']?.toInt() ?? 0,
       timestamp: map['timestamp']?.toInt() ?? 0,
       sourceId: map['sourceId'] ?? 'kisskh',
+      serverId: map['serverId'],
     );
   }
 
@@ -65,6 +69,7 @@ class HistoryItem {
     int? durationMs,
     int? timestamp,
     String? sourceId,
+    String? serverId,
   }) {
     return HistoryItem(
       movieId: movieId ?? this.movieId,
@@ -76,6 +81,7 @@ class HistoryItem {
       durationMs: durationMs ?? this.durationMs,
       timestamp: timestamp ?? this.timestamp,
       sourceId: sourceId ?? this.sourceId,
+      serverId: serverId ?? this.serverId,
     );
   }
 }

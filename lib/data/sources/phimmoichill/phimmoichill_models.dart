@@ -56,7 +56,7 @@ class PhimMoiSearchResponse {
   factory PhimMoiSearchResponse.fromJson(Map<String, dynamic> json) {
     final data = json['data'] ?? {};
     final itemsList = (data['items'] as List?) ?? (data['results'] as List?);
-    
+
     return PhimMoiSearchResponse(
       success: json['success'] ?? false,
       items: itemsList?.map((e) => PhimMoiMovieJson.fromJson(e)).toList() ?? [],

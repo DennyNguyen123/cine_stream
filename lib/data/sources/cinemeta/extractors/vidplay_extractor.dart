@@ -114,7 +114,7 @@ class VidplayExtractor {
 
         if (reqUrl.contains('.m3u8') || reqUrl.contains('mp4-proxy') || reqUrl.contains('.mp4')) {
           foundStreamUrl = reqUrl;
-          print('[VidplayExtractor] ✓ Found stream: $reqUrl');
+          print('[VidplayExtractor] ✓ Found genuine stream: $reqUrl');
           
           if (!completer.isCompleted) {
             timeoutTimer.cancel();
@@ -156,7 +156,7 @@ class VidplayExtractor {
           if (reqUrl.contains('tik.1x2.space') || reqUrl.contains('nightspeedster.app')) return request;
           
           foundStreamUrl = reqUrl;
-          print('[VidplayExtractor] ✓ Found Fetch stream: $reqUrl');
+          print('[VidplayExtractor] ✓ Found genuine stream: $reqUrl');
           
           if (!completer.isCompleted) {
             timeoutTimer.cancel();
@@ -179,7 +179,7 @@ class VidplayExtractor {
           if (reqUrl.contains('tik.1x2.space') || reqUrl.contains('eat-peach.sbs') || reqUrl.contains('nightspeedster.app')) return request;
           
           foundStreamUrl = reqUrl;
-          print('[VidplayExtractor] ✓ Found Ajax stream: $reqUrl');
+          print('[VidplayExtractor] ✓ Found genuine stream: $reqUrl');
           if (!completer.isCompleted) {
             timeoutTimer.cancel();
             final headers = {
@@ -198,7 +198,7 @@ class VidplayExtractor {
           final videoUrl = msg.split(':').skip(1).join(':');
           if (videoUrl.isNotEmpty && !videoUrl.startsWith('blob:') && !completer.isCompleted) {
             foundStreamUrl = videoUrl;
-            print('[VidplayExtractor] ✓ Found video src from console: $videoUrl');
+            print('[VidplayExtractor] ✓ Found genuine stream (console): $videoUrl');
             timeoutTimer.cancel();
             
             final headers = {

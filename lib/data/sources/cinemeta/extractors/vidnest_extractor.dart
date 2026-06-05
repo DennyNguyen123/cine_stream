@@ -94,12 +94,6 @@ class VidnestExtractor {
       shouldInterceptRequest: (controller, request) async {
         final reqUrl = request.url.toString();
 
-        if (reqUrl.contains('.m3u8') || reqUrl.contains('.mp4') ||
-            reqUrl.contains('mp4-proxy') || reqUrl.contains('workers.dev') ||
-            reqUrl.contains('/playlist') || reqUrl.contains('stream')) {
-          print('[VidnestExtractor] ★ Intercepted: $reqUrl');
-        }
-
         if (reqUrl.contains('disable-devtool')) {
           return WebResourceResponse(
             data: Uint8List.fromList([]),
@@ -110,7 +104,7 @@ class VidnestExtractor {
 
         if (reqUrl.contains('.m3u8') || reqUrl.contains('mp4-proxy') || reqUrl.contains('.mp4')) {
           foundStreamUrl = reqUrl;
-          print('[VidnestExtractor] ✓ Found stream: $reqUrl');
+          print('[VidnestExtractor] ✓ Found genuine stream: $reqUrl');
           
           if (!completer.isCompleted) {
             timeoutTimer.cancel();
@@ -137,7 +131,7 @@ class VidnestExtractor {
               }
               
               if (allCookies.isNotEmpty) {
-                headers['Cookie'] = allCookies.values.map((c) => '${c.name}=${c.value}').join('; ');
+                headers['Cookie'] = allCookies.values.map((c) => '\${c.name}=\${c.value}').join('; ');
               }
             } catch (_) {}
 
@@ -153,7 +147,7 @@ class VidnestExtractor {
         
         if (reqUrl.contains('.m3u8') || reqUrl.contains('mp4-proxy') || reqUrl.contains('.mp4')) {
           foundStreamUrl = reqUrl;
-          print('[VidnestExtractor] ✓ Found Fetch stream: $reqUrl');
+          print('[VidnestExtractor] ✓ Found genuine stream: $reqUrl');
           
           if (!completer.isCompleted) {
             timeoutTimer.cancel();
@@ -174,7 +168,7 @@ class VidnestExtractor {
 
         if (reqUrl.contains('.m3u8') || reqUrl.contains('mp4-proxy') || reqUrl.contains('.mp4')) {
           foundStreamUrl = reqUrl;
-          print('[VidnestExtractor] ✓ Found Ajax stream: $reqUrl');
+          print('[VidnestExtractor] ✓ Found genuine stream: $reqUrl');
           if (!completer.isCompleted) {
             timeoutTimer.cancel();
             final headers = {
@@ -188,18 +182,18 @@ class VidnestExtractor {
         return request;
       },
       shouldOverrideUrlLoading: (controller, navigationAction) async { return NavigationActionPolicy.CANCEL; },
-onConsoleMessage: (controller, consoleMessage) {
+      onConsoleMessage: (controller, consoleMessage) {
         final msg = consoleMessage.message;
         if (msg.startsWith('VIDEO_SRC:') || msg.startsWith('VIDEO_CURRENT_SRC:')) {
           final videoUrl = msg.split(':').skip(1).join(':');
           if (videoUrl.isNotEmpty && !videoUrl.startsWith('blob:') && !completer.isCompleted) {
             foundStreamUrl = videoUrl;
-            print('[VidnestExtractor] ✓ Found video src from console: $videoUrl');
+            print('[VidnestExtractor] ✓ Found genuine stream (console): $videoUrl');
             timeoutTimer.cancel();
             
             final headers = {
-              'Referer': 'https://vidnest.cloud/',
-              'Origin': 'https://vidnest.cloud',
+              'Referer': 'https://vidnest.fun/',
+              'Origin': 'https://vidnest.fun',
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             };
             completer.complete(StreamInfo(videoUrl: foundStreamUrl!, subtitles: subtitles, headers: headers));

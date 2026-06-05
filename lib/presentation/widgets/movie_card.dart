@@ -86,6 +86,7 @@ class _MovieCardState extends State<MovieCard> {
                     CachedNetworkImage(
                       imageUrl: widget.movie.thumbnail!,
                       fit: BoxFit.cover,
+                      memCacheWidth: 300,
                       errorWidget: (context, url, error) => _buildFallback(),
                       placeholder: (context, url) => Container(color: AppColors.surfaceVariant),
                     )

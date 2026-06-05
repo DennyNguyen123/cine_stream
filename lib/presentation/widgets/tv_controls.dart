@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
+import 'marquee_text.dart';
 
 class TvControls extends StatefulWidget {
   final String title;
@@ -71,15 +72,20 @@ class _TvControlsState extends State<TvControls> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    _buildIconButton(Icons.arrow_back, widget.onBack, downFocusNode: _playPauseNode),
-                    const SizedBox(width: 16),
-                    Text(
-                      widget.title,
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      _buildIconButton(Icons.arrow_back, widget.onBack, downFocusNode: _playPauseNode),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: MarqueeText(
+                          text: widget.title,
+                          isFocused: true,
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Row(
                   children: [
