@@ -1,4 +1,4 @@
-package com.kisskh.androidtv.cine_stream
+package com.dennynguyen123.cinestream
 
 import android.content.Context
 import android.os.Handler
