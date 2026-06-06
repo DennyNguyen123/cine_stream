@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/repositories/history_repository.dart';
+import '../data/services/webdav_service.dart';
 
 import '../data/repositories/subtitle_repository_impl.dart';
 import '../data/repositories/translation_service.dart';
@@ -33,10 +34,19 @@ Future<void> setupInjection() async {
   // Repositories
   final prefs = await SharedPreferences.getInstance();
   getIt.registerLazySingleton<SharedPreferences>(() => prefs);
-  getIt.registerLazySingleton<HistoryRepository>(() => HistoryRepositoryImpl(getIt()));
+  getIt.registerLazySingleton<HistoryRepository>(() => HistoryRepositoryImpl(getIt(), getIt()));
   getIt.registerLazySingleton<SubtitleRepository>(() => SubtitleRepositoryImpl(getIt()));
   getIt.registerLazySingleton<ExternalSubtitleRepository>(() => ExternalSubtitleRepository(getIt()));
   getIt.registerLazySingleton<TranslationService>(() => TranslationService(getIt()));
+  
+  final webdavService = WebDAVService();
+  webdavService.init(
+    prefs.getString('cinestream_webdav_url') ?? '',
+    prefs.getString('cinestream_webdav_user') ?? '',
+    prefs.getString('cinestream_webdav_pass') ?? '',
+    folderPath: prefs.getString('cinestream_webdav_path') ?? '/CineStream',
+  );
+  getIt.registerLazySingleton<WebDAVService>(() => webdavService);
   
   // Sources
   getIt.registerLazySingleton(() => KissKhApi(getIt()));

@@ -25,6 +25,12 @@ class HistoryCubit extends Cubit<HistoryState> {
     try {
       final items = await _repository.getHistory();
       emit(HistoryLoaded(items));
+      
+      // Background sync and refresh
+      _repository.syncWithWebDAV().then((_) async {
+        final newItems = await _repository.getHistory();
+        if (!isClosed) emit(HistoryLoaded(newItems));
+      });
     } catch (e) {
       emit(HistoryError(e.toString()));
     }

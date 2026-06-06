@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:video_player/video_player.dart';
 import '../../core/theme/app_colors.dart';
 import '../widgets/tv_controls.dart';
@@ -69,6 +70,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Duration _targetSeekPosition = Duration.zero;
   Timer? _seekDebounceTimer;
   Timer? _hideControlsTimer;
+  
+  int _seekAccumulator = 0;
+  Timer? _seekOverlayTimer;
+  
+  String? _toastMessage;
+  Timer? _toastTimer;
 
   List<SubtitleCue> _primaryCues = [];
   List<SubtitleCue> _secondaryCues = [];
@@ -93,6 +100,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    
       print('[PlayerScreen] Initializing with videoUrl: ${widget.streamInfo.videoUrl}');
       print('[PlayerScreen] Initializing with headers: ${widget.streamInfo.headers}');
       
@@ -107,7 +120,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
             });
           }
           final response = await request.close();
+          final bodyBytes = await response.map((chunk) => chunk).toList();
+          final bodyString = String.fromCharCodes(bodyBytes.expand((x) => x).take(500));
           print('[PlayerScreen] DIAGNOSTIC HTTP TEST: ${response.statusCode}');
+          print('[PlayerScreen] DIAGNOSTIC HTTP BODY: $bodyString');
         } catch (e) {
           print('[PlayerScreen] DIAGNOSTIC HTTP TEST FAILED: $e');
         }
@@ -277,7 +293,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _translateSubtitles(SubtitleTrack targetSub, bool isTop, {String targetLang = 'vi'}) async {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Translating... this may take a moment')));
+    _showToast('Translating... this may take a moment');
     
     try {
       if (_availableSubtitles.isEmpty) {
@@ -355,12 +371,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           }
           _videoListener(); // Recalculate cue immediately if paused
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Translation applied!')));
+        _showToast('Translation applied!');
       }
     } catch (e) {
       debugPrint('Translate error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Translation failed: $e')));
+        _showToast('Translation failed: $e');
       }
     }
   }
@@ -445,12 +461,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
     
     _controller.pause();
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
 
     try {
       final source = getIt<MovieSource>();
@@ -461,8 +471,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       );
       
       if (!mounted) return;
-      
-      Navigator.pop(context); // hide loading
       
       if (streamInfo != null) {
         final hasMultipleSeasons = widget.allEpisodes.map((e) => e.season).toSet().length > 1;
@@ -496,7 +504,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
       setState(() => _isChangingEpisode = false);
       _showErrorDialog(e.toString().replaceAll('Exception: ', ''));
     }
@@ -509,20 +516,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
     
     _controller.pause();
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
 
     try {
       final source = getIt<MovieSource>();
       final streamInfo = await source.getStreamInfo(widget.movieId, widget.episodeId, serverId: serverId);
       
       if (!mounted) return;
-      
-      Navigator.pop(context); // hide loading
       
       if (streamInfo != null) {
         Navigator.pushReplacement(
@@ -547,7 +546,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
       setState(() => _isChangingEpisode = false);
       _showErrorDialog(e.toString().replaceAll('Exception: ', ''));
     }
@@ -648,10 +646,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _seekDebounceTimer?.cancel();
     _hideControlsTimer?.cancel();
     _backPressTimer?.cancel();
+    _seekOverlayTimer?.cancel();
+    _toastTimer?.cancel();
     _controlsScopeNode.dispose();
     _playerFocusNode.dispose();
     _controller.removeListener(_videoListener);
     _controller.dispose();
+    
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    
     super.dispose();
   }
 
@@ -663,23 +671,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
        return;
     }
 
+    if (_showControls) {
+       setState(() => _showControls = false);
+       _playerFocusNode.requestFocus();
+       return;
+    }
+
     _backPressCount++;
     if (_backPressCount >= 2) {
       _exitPlayer();
     } else {
-      if (_showControls) {
-         setState(() => _showControls = false);
-         _playerFocusNode.requestFocus();
-      }
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bấm Back lần nữa để thoát'), duration: Duration(seconds: 2)),
-      );
+      _showToast('Bấm Back lần nữa để thoát');
       _backPressTimer?.cancel();
       _backPressTimer = Timer(const Duration(seconds: 2), () {
         _backPressCount = 0;
       });
     }
+  }
+
+  void _showToast(String message) {
+    if (!mounted) return;
+    setState(() => _toastMessage = message);
+    _toastTimer?.cancel();
+    _toastTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _toastMessage = null);
+    });
   }
 
   void _exitPlayer() {
@@ -704,10 +720,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
           focusNode: _playerFocusNode,
           onKeyEvent: (node, event) {
           if (event is KeyDownEvent) {
-            bool isSeekKey = event.logicalKey == LogicalKeyboardKey.arrowLeft || event.logicalKey == LogicalKeyboardKey.arrowRight;
-            
-            // Allow focus traversal if controls are shown, unless we are already seeking
-            if (isSeekKey) {
+              if (event.logicalKey == LogicalKeyboardKey.space) {
+                if (_isPlaying) {
+                  _controller.pause();
+                } else {
+                  _controller.play();
+                }
+                return KeyEventResult.handled;
+              }
+              
+              bool isSeekKey = event.logicalKey == LogicalKeyboardKey.arrowLeft || event.logicalKey == LogicalKeyboardKey.arrowRight;
+              
+              // Allow focus traversal if controls are shown, unless we are already seeking
+              if (isSeekKey) {
               if (_showControls && !_isSeeking) {
                  // We are showing controls, and not currently seeking.
                  // We should only intercept seek if the user is NOT focused on the Top Bar.
@@ -736,8 +761,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
               final int seekStep = 10; // 10 seconds step
               if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
                 _targetSeekPosition += Duration(seconds: seekStep);
+                _seekAccumulator += seekStep;
               } else {
                 _targetSeekPosition -= Duration(seconds: seekStep);
+                _seekAccumulator -= seekStep;
               }
               
               // Clamp position
@@ -749,8 +776,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
               
               setState(() {});
               
+              _seekOverlayTimer?.cancel();
+              _seekOverlayTimer = Timer(const Duration(seconds: 1), () {
+                if (mounted) setState(() => _seekAccumulator = 0);
+              });
+              
               _seekDebounceTimer?.cancel();
-              _seekDebounceTimer = Timer(const Duration(seconds: 1), () {
+              _seekDebounceTimer = Timer(const Duration(milliseconds: 400), () {
                 _controller.seekTo(_targetSeekPosition).then((_) {
                   if (mounted) {
                     setState(() {
@@ -775,9 +807,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
-            if (!_showControls) {
-              toggleControls();
-            }
+            toggleControls();
           },
           child: Stack(
             children: [
@@ -791,6 +821,122 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     : const CircularProgressIndicator(color: AppColors.primary),
               ),
               
+              // Double tap zones
+              Positioned.fill(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onDoubleTap: () {
+                          if (!_isSeeking) {
+                            _isSeeking = true;
+                            _targetSeekPosition = _position;
+                            if (_isPlaying) _controller.pause();
+                          }
+                          _targetSeekPosition -= const Duration(seconds: 10);
+                          _seekAccumulator -= 10;
+                          if (_targetSeekPosition < Duration.zero) _targetSeekPosition = Duration.zero;
+                          setState(() {});
+                          
+                          _seekOverlayTimer?.cancel();
+                          _seekOverlayTimer = Timer(const Duration(seconds: 1), () {
+                            if (mounted) setState(() => _seekAccumulator = 0);
+                          });
+                          
+                          _seekDebounceTimer?.cancel();
+                          _seekDebounceTimer = Timer(const Duration(milliseconds: 400), () {
+                            _controller.seekTo(_targetSeekPosition).then((_) {
+                              if (mounted) {
+                                setState(() => _isSeeking = false);
+                                _controller.play();
+                              }
+                            });
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onDoubleTap: () {
+                          if (!_isSeeking) {
+                            _isSeeking = true;
+                            _targetSeekPosition = _position;
+                            if (_isPlaying) _controller.pause();
+                          }
+                          _targetSeekPosition += const Duration(seconds: 10);
+                          _seekAccumulator += 10;
+                          if (_targetSeekPosition > _duration) _targetSeekPosition = _duration;
+                          setState(() {});
+                          
+                          _seekOverlayTimer?.cancel();
+                          _seekOverlayTimer = Timer(const Duration(seconds: 1), () {
+                            if (mounted) setState(() => _seekAccumulator = 0);
+                          });
+                          
+                          _seekDebounceTimer?.cancel();
+                          _seekDebounceTimer = Timer(const Duration(milliseconds: 400), () {
+                            _controller.seekTo(_targetSeekPosition).then((_) {
+                              if (mounted) {
+                                setState(() => _isSeeking = false);
+                                _controller.play();
+                              }
+                            });
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Visual Seek Indicator & Loading Indicator
+              if (_isChangingEpisode)
+                const Align(
+                  alignment: Alignment.center,
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
+              else if (_seekAccumulator != 0)
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(32),
+                    ),
+                    child: Text(
+                      _seekAccumulator > 0 ? '+${_seekAccumulator}s' : '${_seekAccumulator}s',
+                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+
+              // Custom Toast Overlay
+              if (_toastMessage != null)
+                Positioned(
+                  top: 48,
+                  left: 24,
+                  right: 24,
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: Text(
+                        _toastMessage!,
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+
               // Subtitles Overlay
               Positioned.fill(
                 child: DualSubtitleDisplay(
@@ -848,13 +994,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             }
                             
                             _targetSeekPosition += Duration(seconds: seconds);
+                            _seekAccumulator += seconds;
+                            
                             if (_targetSeekPosition < Duration.zero) _targetSeekPosition = Duration.zero;
                             if (_targetSeekPosition > _duration) _targetSeekPosition = _duration;
                             
                             setState(() {});
                             
+                            _seekOverlayTimer?.cancel();
+                            _seekOverlayTimer = Timer(const Duration(seconds: 1), () {
+                              if (mounted) setState(() => _seekAccumulator = 0);
+                            });
+                            
                             _seekDebounceTimer?.cancel();
-                            _seekDebounceTimer = Timer(const Duration(seconds: 1), () {
+                            _seekDebounceTimer = Timer(const Duration(milliseconds: 400), () {
                               _controller.seekTo(_targetSeekPosition).then((_) {
                                 if (mounted) {
                                   setState(() {
@@ -863,6 +1016,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                   _controller.play();
                                 }
                               });
+                            });
+                          },
+                          onDragStart: (val) {
+                            setState(() {
+                              _isSeeking = true;
+                              _targetSeekPosition = Duration(seconds: val.toInt());
+                            });
+                            if (_isPlaying) _controller.pause();
+                            _seekDebounceTimer?.cancel();
+                          },
+                          onDragUpdate: (val) {
+                            setState(() {
+                              _targetSeekPosition = Duration(seconds: val.toInt());
+                            });
+                          },
+                          onDragEnd: (val) {
+                            final seekPos = Duration(seconds: val.toInt());
+                            setState(() {
+                              _targetSeekPosition = seekPos;
+                            });
+                            _controller.seekTo(seekPos).then((_) {
+                              if (mounted) {
+                                setState(() {
+                                  _isSeeking = false;
+                                });
+                                _controller.play();
+                              }
                             });
                           },
                           onPlayPause: () {
@@ -877,42 +1057,39 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             }
                           },
                       onSubtitleToggle: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => _buildSubtitleSelectionDialog(context),
+                        _showSidePanel(
+                          context,
+                          _buildSubtitleSelectionDialog(context),
                         );
                       },
                       onSettings: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => Dialog(
-                            backgroundColor: Colors.transparent,
-                            child: PlayerSettingsDialog(
-                              currentSpeed: _playbackSpeed,
-                              autoNext: _autoNext,
-                              onSpeedChanged: (speed) {
-                                setState(() => _playbackSpeed = speed);
-                                _controller.setPlaybackSpeed(speed);
-                                getIt<SharedPreferences>().setDouble('playback_speed', speed);
-                              },
-                              onAutoNextChanged: (val) {
-                                setState(() => _autoNext = val);
-                                getIt<SharedPreferences>().setBool('auto_next', val);
-                              },
-                            ),
+                        _showSidePanel(
+                          context,
+                          PlayerSettingsDialog(
+                            currentSpeed: _playbackSpeed,
+                            autoNext: _autoNext,
+                            onSpeedChanged: (speed) {
+                              setState(() => _playbackSpeed = speed);
+                              _controller.setPlaybackSpeed(speed);
+                              getIt<SharedPreferences>().setDouble('playback_speed', speed);
+                            },
+                            onAutoNextChanged: (val) {
+                              setState(() => _autoNext = val);
+                              getIt<SharedPreferences>().setBool('auto_next', val);
+                            },
                           ),
                         );
                       },
                       onEpisodes: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => _buildEpisodesDialog(context),
+                        _showSidePanel(
+                          context,
+                          _buildEpisodesDialog(context),
                         );
                       },
                       onServerToggle: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => _buildServerDialog(context),
+                        _showSidePanel(
+                          context,
+                          _buildServerDialog(context),
                         );
                       },
                       onBack: () {
@@ -931,21 +1108,53 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  Widget _buildSubtitleSelectionDialog(BuildContext context) {
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      child: StatefulBuilder(
-        builder: (context, setDialogState) {
-          return Container(
-            width: 450,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text('Dual Subtitles Selection', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+  void _showSidePanel(BuildContext context, Widget child) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'SidePanel',
+      barrierColor: Colors.black26,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Material(
+            color: Colors.transparent,
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.4 > 350 ? 350 : MediaQuery.of(context).size.width * 0.85,
+                  height: double.infinity,
+                  color: AppColors.surface.withValues(alpha: 0.7),
+                  child: SafeArea(child: child),
                 ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+          child: child,
+        );
+      },
+    );
+  }
+
+  Widget _buildSubtitleSelectionDialog(BuildContext context) {
+    return StatefulBuilder(
+      builder: (context, setDialogState) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Dual Subtitles Selection', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              ),
                 _buildSubtitleRow(
                   context: context,
                   title: 'Top Subtitle',
@@ -979,9 +1188,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
               ],
             ),
-          );
-        }
-      ),
+        );
+      }
     );
   }
 
@@ -1087,56 +1295,62 @@ class _PlayerScreenState extends State<PlayerScreen> {
     langList.add('Vietnamese (Translate)');
     langList.add('English (Translate)');
     
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: AppColors.surface,
-        child: Container(
-          width: 300,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: langList.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return ListTile(
-                  title: const Text('Off', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
-                    getIt<SharedPreferences>().setString('${prefPrefix}_lang', 'off');
-                    setState(() {
-                      if (isTop) {
-                        _selectedSub = null;
-                        _primaryCues = [];
-                      } else {
-                        _selectedSecondarySub = null;
-                        _secondaryCues = [];
-                      }
-                    });
-                    Navigator.pop(context);
-                  },
-                );
-              }
-              
-              final lang = langList[index - 1];
-              return ListTile(
-                title: Text(lang, style: const TextStyle(color: Colors.white)),
-                onTap: () {
-                   Navigator.pop(context);
-                   if (lang.contains('(Translate)')) {
-                      final target = lang.startsWith('Vietnamese') ? 'vi' : 'en';
-                      final tSub = SubtitleTrack(id: -1, label: lang, src: 'translate_$target');
-                      _applySubtitle(tSub, isTop, trackIndex: 0);
-                   } else {
-                      final tracks = _availableSubtitles.where((s) => _getBaseLanguage(s) == lang).toList();
-                      if (tracks.isNotEmpty) {
-                         _applySubtitle(tracks.first, isTop, trackIndex: 0);
-                      }
-                   }
+    _showSidePanel(
+      context,
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Select Language', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: langList.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return ListTile(
+                      title: const Text('Off', style: TextStyle(color: Colors.white)),
+                      onTap: () {
+                        final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
+                        getIt<SharedPreferences>().setString('${prefPrefix}_lang', 'off');
+                        setState(() {
+                          if (isTop) {
+                            _selectedSub = null;
+                            _primaryCues = [];
+                          } else {
+                            _selectedSecondarySub = null;
+                            _secondaryCues = [];
+                          }
+                        });
+                        Navigator.pop(context);
+                      },
+                    );
+                  }
+                  
+                  final lang = langList[index - 1];
+                  return ListTile(
+                    title: Text(lang, style: const TextStyle(color: Colors.white)),
+                    onTap: () {
+                       Navigator.pop(context);
+                       if (lang.contains('(Translate)')) {
+                          final target = lang.startsWith('Vietnamese') ? 'vi' : 'en';
+                          final tSub = SubtitleTrack(id: -1, label: lang, src: 'translate_$target');
+                          _applySubtitle(tSub, isTop, trackIndex: 0);
+                       } else {
+                          final tracks = _availableSubtitles.where((s) => _getBaseLanguage(s) == lang).toList();
+                          if (tracks.isNotEmpty) {
+                             _applySubtitle(tracks.first, isTop, trackIndex: 0);
+                          }
+                       }
+                    },
+                  );
                 },
-              );
-            },
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1145,76 +1359,77 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _showTrackSelector(BuildContext context, bool isTop, String language) {
     final tracks = _availableSubtitles.where((s) => _getBaseLanguage(s) == language).toList();
     
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: AppColors.surface,
-        child: Container(
-          width: 300,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: tracks.length,
-            itemBuilder: (context, index) {
-              final sub = tracks[index];
-              return ListTile(
-                title: Text('Track ${index + 1}', style: const TextStyle(color: Colors.white)),
-                onTap: () {
-                   Navigator.pop(context);
-                   _applySubtitle(sub, isTop, trackIndex: index);
+    _showSidePanel(
+      context,
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Select Track', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: tracks.length,
+                itemBuilder: (context, index) {
+                  final sub = tracks[index];
+                  return ListTile(
+                    title: Text('Track ${index + 1}', style: const TextStyle(color: Colors.white)),
+                    onTap: () {
+                       Navigator.pop(context);
+                       _applySubtitle(sub, isTop, trackIndex: index);
+                    },
+                  );
                 },
-              );
-            },
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   void _showTranslateSourceSelector(BuildContext context, bool isTop, SubtitleTrack targetSub) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: AppColors.surface,
-        child: Container(
-          width: 300,
-          height: 400, // Fixed height since there could be many tracks
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Text('Select Translation Source', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+    _showSidePanel(
+      context,
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text('Select Translation Source', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            const Divider(color: Colors.white24),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _availableSubtitles.length,
+                itemBuilder: (context, index) {
+                  final srcSub = _availableSubtitles[index];
+                  final baseLang = _getBaseLanguage(srcSub);
+                  
+                  final peers = _availableSubtitles.where((s) => _getBaseLanguage(s) == baseLang).toList();
+                  final localIdx = peers.indexWhere((s) => s.id == srcSub.id);
+                  
+                  return ListTile(
+                    title: Text('$baseLang - Track ${localIdx + 1}', style: const TextStyle(color: Colors.white)),
+                    onTap: () {
+                       Navigator.pop(context);
+                       final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
+                       getIt<SharedPreferences>().setString('${prefPrefix}_trans_lang', baseLang.toLowerCase());
+                       getIt<SharedPreferences>().setInt('${prefPrefix}_trans_track', localIdx);
+                       
+                       final target = targetSub.src.split('_')[1];
+                       _translateSubtitles(targetSub, isTop, targetLang: target);
+                    },
+                  );
+                },
               ),
-              const Divider(color: Colors.white24),
-              Expanded(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _availableSubtitles.length,
-                  itemBuilder: (context, index) {
-                    final srcSub = _availableSubtitles[index];
-                    final baseLang = _getBaseLanguage(srcSub);
-                    
-                    final peers = _availableSubtitles.where((s) => _getBaseLanguage(s) == baseLang).toList();
-                    final localIdx = peers.indexWhere((s) => s.id == srcSub.id);
-                    
-                    return ListTile(
-                      title: Text('$baseLang - Track ${localIdx + 1}', style: const TextStyle(color: Colors.white)),
-                      onTap: () {
-                         Navigator.pop(context);
-                         final prefPrefix = isTop ? 'pref_sub_top' : 'pref_sub_bottom';
-                         getIt<SharedPreferences>().setString('${prefPrefix}_trans_lang', baseLang.toLowerCase());
-                         getIt<SharedPreferences>().setInt('${prefPrefix}_trans_track', localIdx);
-                         
-                         final target = targetSub.src.split('_')[1];
-                         _translateSubtitles(targetSub, isTop, targetLang: target);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1230,54 +1445,49 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final currentIndex = sortedEpisodes.indexWhere((e) => e.id == widget.episodeId);
     final scrollController = ScrollController(initialScrollOffset: currentIndex > 0 ? currentIndex * 56.0 : 0);
     
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      child: Container(
-        width: 350,
-        height: 500,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('Episodes', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Episodes', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          ),
+          Expanded(
+            child: ListView.builder(
+              controller: scrollController,
+              itemCount: sortedEpisodes.length,
+              itemBuilder: (context, index) {
+                final ep = sortedEpisodes[index];
+                final isCurrent = ep.id == widget.episodeId;
+                final hasMultipleSeasons = widget.allEpisodes.map((e) => e.season).toSet().length > 1;
+                String titleStr = ep.title ?? 'Episode ${ep.number.toInt()}';
+                if (hasMultipleSeasons && !titleStr.toUpperCase().startsWith('S${ep.season}')) {
+                  titleStr = 'S${ep.season} - $titleStr';
+                }
+                final displayName = titleStr;
+                    
+                return ListTile(
+                  focusColor: Colors.white24,
+                  title: Text(
+                    displayName, 
+                    style: TextStyle(
+                      color: isCurrent ? AppColors.primary : Colors.white,
+                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                    )
+                  ),
+                  tileColor: isCurrent ? Colors.white12 : Colors.transparent,
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (!isCurrent) {
+                      _changeEpisode(ep);
+                    }
+                  },
+                );
+              },
             ),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                itemCount: sortedEpisodes.length,
-                itemBuilder: (context, index) {
-                  final ep = sortedEpisodes[index];
-                  final isCurrent = ep.id == widget.episodeId;
-                  final hasMultipleSeasons = widget.allEpisodes.map((e) => e.season).toSet().length > 1;
-                  String titleStr = ep.title ?? 'Episode ${ep.number.toInt()}';
-                  if (hasMultipleSeasons && !titleStr.toUpperCase().startsWith('S${ep.season}')) {
-                    titleStr = 'S${ep.season} - $titleStr';
-                  }
-                  final displayName = titleStr;
-                      
-                  return ListTile(
-                    focusColor: Colors.white24,
-                    title: Text(
-                      displayName, 
-                      style: TextStyle(
-                        color: isCurrent ? AppColors.primary : Colors.white,
-                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                      )
-                    ),
-                    tileColor: isCurrent ? Colors.white12 : Colors.transparent,
-                    onTap: () {
-                      Navigator.pop(context);
-                      if (!isCurrent) {
-                        _changeEpisode(ep);
-                      }
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1285,55 +1495,45 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Widget _buildServerDialog(BuildContext context) {
     final servers = widget.servers ?? widget.streamInfo.servers;
     if (servers.isEmpty) {
-       return const Dialog(
-         backgroundColor: AppColors.surface,
-         child: Padding(
-           padding: EdgeInsets.all(24.0),
-           child: Text('No other servers available', style: TextStyle(color: Colors.white)),
-         ),
+       return const Padding(
+         padding: EdgeInsets.all(24.0),
+         child: Text('No other servers available', style: TextStyle(color: Colors.white)),
        );
     }
     
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      child: Container(
-        width: 350,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('Select Server', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: servers.map((server) {
-                    String? activeServerId = widget.streamInfo.currentServerId ?? widget.serverId;
-                    if (activeServerId == null && servers.isNotEmpty) {
-                      activeServerId = servers.first.id;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Select Server', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          ),
+          Expanded(
+            child: ListView(
+              children: servers.map((server) {
+                String? activeServerId = widget.streamInfo.currentServerId ?? widget.serverId;
+                if (activeServerId == null && servers.isNotEmpty) {
+                  activeServerId = servers.first.id;
+                }
+                final isCurrent = server.id == activeServerId;
+                return ListTile(
+                  autofocus: server == servers.first,
+                  focusColor: Colors.white24,
+                  title: Text(server.name, style: TextStyle(color: isCurrent ? AppColors.primary : Colors.white)),
+                  trailing: isCurrent ? const Icon(Icons.check, color: AppColors.primary) : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (!isCurrent) {
+                       _changeServer(server.id);
                     }
-                    final isCurrent = server.id == activeServerId;
-                    return ListTile(
-                      autofocus: server == servers.first,
-                      focusColor: Colors.white24,
-                      title: Text(server.name, style: TextStyle(color: isCurrent ? AppColors.primary : Colors.white)),
-                      trailing: isCurrent ? const Icon(Icons.check, color: AppColors.primary) : null,
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (!isCurrent) {
-                           _changeServer(server.id);
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
+                  },
+                );
+              }).toList(),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

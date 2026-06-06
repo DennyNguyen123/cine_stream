@@ -1,0 +1,204 @@
+name: Auto Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on tags matching v*, e.g., v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Tests
+        run: flutter test
+
+      - name: Patch isar_flutter_libs Android SDK Version
+        run: |
+          for file in ~/.pub-cache/hosted/pub.dev/isar_flutter_libs-*/android/build.gradle; do
+            sed -i 's/compileSdkVersion 30/compileSdkVersion 34\n    namespace "dev.isar.isar_flutter_libs"/g' "$file"
+            sed -i 's/minSdkVersion 16/minSdkVersion 21/g' "$file"
+          done
+
+      - name: Run Code Generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+        with:
+          cache: true
+
+      - name: Build APK via Shorebird (arm64)
+        run: shorebird release android --artifact apk --target-platform android-arm64 --flutter-version=3.41.9
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+
+      - name: Rename APK
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk AudireReader-Android-arm64.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudireReader-Android-APK
+          path: AudireReader-Android-arm64.apk
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Tests
+        run: flutter test
+
+      - name: Run Code Generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+        with:
+          cache: true
+
+      - name: Build Windows App via Shorebird
+        run: shorebird release windows --flutter-version=3.41.9
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+
+      - name: Packaging Installer
+        run: dart run inno_bundle --no-app
+
+      - name: Compress Windows Build
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath AudireReader-Windows.zip
+
+      - name: Rename Installer
+        run: Move-Item build\windows\x64\installer\Release\*.exe AudireReader-Windows-Setup.exe
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudireReader-Windows-ZIP
+          path: |
+            AudireReader-Windows.zip
+            AudireReader-Windows-Setup.exe
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: 'stable'
+
+      - name: Setup CocoaPods
+        uses: maxim-lobanov/setup-cocoapods@v1
+        with:
+          version: 1.16.2
+
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run Tests
+        run: flutter test
+
+      - name: Run Code Generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Configure iOS Permissions
+        run: |
+          PLIST_PATH="ios/Runner/Info.plist"
+          plutil -insert UIBackgroundModes -xml "<array><string>audio</string></array>" $PLIST_PATH || true
+          plutil -replace UISupportsDocumentBrowser -bool true $PLIST_PATH || true
+          plutil -replace UIFileSharingEnabled -bool true $PLIST_PATH || true
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+        with:
+          cache: true
+
+      - name: Diagnose Flutter iOS Build
+        run: flutter build ipa --release --no-codesign
+        continue-on-error: true
+
+      - name: Build iOS Application (No Codesign) via Shorebird
+        run: shorebird release ios --no-codesign --verbose --flutter-version=3.41.9
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+
+      - name: Package into unsigned IPA
+        run: |
+          ARCHIVE_PATH=$(find build/ios/archive -name "*.xcarchive" | head -1)
+          echo "Found archive: $ARCHIVE_PATH"
+          mkdir -p Payload
+          cp -r "$ARCHIVE_PATH/Products/Applications/Runner.app" Payload/
+          zip -r AudireReader-iOS.ipa Payload
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudireReader-iOS-IPA
+          path: AudireReader-iOS.ipa
+
+  release:
+    needs: [build-android, build-windows, build-ios]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: AudireReader-Android-APK
+
+      - name: Download Windows ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: AudireReader-Windows-ZIP
+
+      - name: Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: AudireReader-iOS-IPA
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            AudireReader-Android-arm64.apk
+            AudireReader-Windows.zip
+            AudireReader-Windows-Setup.exe
+            AudireReader-iOS.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

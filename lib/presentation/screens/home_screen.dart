@@ -2,6 +2,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/movie.dart';
 import '../../domain/entities/history_item.dart';
@@ -14,6 +17,9 @@ import 'detail_screen.dart';
 import 'search_screen.dart';
 import '../widgets/movie_row.dart';
 import '../widgets/marquee_text.dart';
+import 'settings/tv_sync_screen.dart';
+import 'settings/mobile_sync_screen.dart';
+import 'settings/webdav_setup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -163,13 +169,22 @@ class _TopBar extends StatefulWidget {
 class _TopBarState extends State<_TopBar> {
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Padding(
-      padding: const EdgeInsets.only(top: 24.0, right: 48.0, left: 48.0),
+      padding: EdgeInsets.only(top: 24.0, right: isMobile ? 16.0 : 48.0, left: isMobile ? 16.0 : 48.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _SourceButton(),
-          _SearchButton(),
+          Flexible(child: _SourceButton()),
+          const SizedBox(width: 8),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _SettingsButton(),
+              const SizedBox(width: 16),
+              _SearchButton(),
+            ],
+          ),
         ],
       ),
     );
@@ -207,17 +222,17 @@ class _SourceButtonState extends State<_SourceButton> {
           transformAlignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: _isFocused ? AppColors.primary : Colors.black45,
+            color: _isFocused ? AppColors.primary : Colors.black.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: _isFocused ? Colors.white : Colors.transparent,
-              width: 2,
+              color: _isFocused ? Colors.white : Colors.white24,
+              width: 1.5,
             ),
             boxShadow: _isFocused
                 ? [
                     BoxShadow(
                       color: AppColors.primary.withValues(alpha: 0.6),
-                      blurRadius: 10,
+                      blurRadius: 15,
                       spreadRadius: 2,
                     )
                   ]
@@ -228,10 +243,13 @@ class _SourceButtonState extends State<_SourceButton> {
             children: [
               const Icon(Icons.source, color: Colors.white, size: 20),
               const SizedBox(width: 8),
-              Text(
-                sourceManager.activeSource.sourceName,
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold),
+              Flexible(
+                child: Text(
+                  sourceManager.activeSource.sourceName,
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -244,51 +262,60 @@ class _SourceButtonState extends State<_SourceButton> {
     final sourceManager = getIt<SourceManager>();
     final sources = sourceManager.getAvailableSources();
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title:
-            const Text('Select Source', style: TextStyle(color: Colors.white)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: sources.length,
-            itemBuilder: (dialogCtx, index) {
-              final source = sources[index];
-              final isSelected =
-                  sourceManager.activeSourceId == source['id'];
-              return ListTile(
-                autofocus: isSelected,
-                focusColor: Colors.white24,
-                title: Text(source['name'] ?? '',
-                    style: const TextStyle(color: Colors.white)),
-                trailing: isSelected
-                    ? const Icon(Icons.check, color: AppColors.primary)
-                    : null,
-                tileColor:
-                    isSelected ? Colors.white12 : Colors.transparent,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  if (!isSelected) {
-                    await sourceManager.setActiveSource(source['id']!);
-                    // Chủ động xoá cache ảnh cũ khi đổi nguồn để giải phóng RAM cho TV Box
-                    PaintingBinding.instance.imageCache.clear();
-                    PaintingBinding.instance.imageCache.clearLiveImages();
-                    
-                    if (!context.mounted) return;
-                    context.read<HomeCubit>().loadData();
-                    context.read<HistoryCubit>().loadHistory();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text(
-                              'Changed source to: ${source['name']}')),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            color: AppColors.surface.withValues(alpha: 0.8),
+            padding: const EdgeInsets.only(top: 24, bottom: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                  child: Text('Select Source', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                ),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: sources.length,
+                  itemBuilder: (dialogCtx, index) {
+                    final source = sources[index];
+                    final isSelected = sourceManager.activeSourceId == source['id'];
+                    return ListTile(
+                      autofocus: isSelected,
+                      focusColor: Colors.white24,
+                      title: Text(source['name'] ?? '',
+                          style: TextStyle(
+                            color: isSelected ? AppColors.primary : Colors.white,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          )),
+                      trailing: isSelected
+                          ? const Icon(Icons.check, color: AppColors.primary)
+                          : null,
+                      tileColor: isSelected ? Colors.white12 : Colors.transparent,
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        if (!isSelected) {
+                          await sourceManager.setActiveSource(source['id']!);
+                          PaintingBinding.instance.imageCache.clear();
+                          PaintingBinding.instance.imageCache.clearLiveImages();
+                          
+                          if (!context.mounted) return;
+                          context.read<HomeCubit>().loadData();
+                          context.read<HistoryCubit>().loadHistory();
+                        }
+                      },
                     );
-                  }
-                },
-              );
-            },
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -334,11 +361,11 @@ class _SearchButtonState extends State<_SearchButton> {
           transformAlignment: Alignment.center,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _isFocused ? AppColors.primary : Colors.black45,
+            color: _isFocused ? AppColors.primary : Colors.black.withValues(alpha: 0.6),
             shape: BoxShape.circle,
             border: Border.all(
-              color: _isFocused ? Colors.white : Colors.transparent,
-              width: 2,
+              color: _isFocused ? Colors.white : Colors.white24,
+              width: 1.5,
             ),
             boxShadow: _isFocused
                 ? [
@@ -350,7 +377,117 @@ class _SearchButtonState extends State<_SearchButton> {
                   ]
                 : [],
           ),
-          child: const Icon(Icons.search, color: Colors.white, size: 28),
+          child: const Icon(Icons.search, color: Colors.white, size: 24),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsButton extends StatefulWidget {
+  @override
+  State<_SettingsButton> createState() => _SettingsButtonState();
+}
+
+class _SettingsButtonState extends State<_SettingsButton> {
+  bool _isFocused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (focused) => setState(() => _isFocused = focused),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.select ||
+                event.logicalKey == LogicalKeyboardKey.enter)) {
+          _showSettingsDialog(context);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: () {
+          _showSettingsDialog(context);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          transform: Matrix4.diagonal3Values(
+              _isFocused ? 1.1 : 1.0, _isFocused ? 1.1 : 1.0, 1.0),
+          transformAlignment: Alignment.center,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _isFocused ? AppColors.primary : Colors.black.withValues(alpha: 0.6),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: _isFocused ? Colors.white : Colors.white24,
+              width: 1.5,
+            ),
+            boxShadow: _isFocused
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.6),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                    )
+                  ]
+                : [],
+          ),
+          child: const Icon(Icons.settings, color: Colors.white, size: 24),
+        ),
+      ),
+    );
+  }
+
+  void _showSettingsDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            color: AppColors.surface.withValues(alpha: 0.8),
+            padding: const EdgeInsets.only(top: 24, bottom: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                  child: Text('WEBDAV', style: TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                ),
+                ListTile(
+                  autofocus: true,
+                  focusColor: Colors.white24,
+                  leading: const Icon(Icons.cloud_sync, color: Colors.white),
+                  title: const Text('WebDAV Configuration', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const WebdavSetupScreen()));
+                  },
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Divider(color: Colors.white24, thickness: 1),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                  child: Text('ABOUT', style: TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                ),
+                ListTile(
+                  focusColor: Colors.white24,
+                  leading: const Icon(Icons.code, color: Colors.white),
+                  title: const Text('Source Code (GitHub)', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('github.com/DennyNguyen123/cine_stream', style: TextStyle(color: Colors.white70)),
+                  onTap: () {
+                    launchUrl(Uri.parse('https://github.com/DennyNguyen123/cine_stream'), mode: LaunchMode.externalApplication);
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -409,12 +546,13 @@ class _HistoryRowState extends State<_FocusableHistoryRow> {
   }
 
   Widget _buildHistoryColumn(List<HistoryItem> items) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 58.0),
-          child: Text(
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 16.0 : 58.0),
+          child: const Text(
             'Continue Watching',
             style: TextStyle(
               color: Colors.white,
@@ -425,11 +563,11 @@ class _HistoryRowState extends State<_FocusableHistoryRow> {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 180,
+          height: isMobile ? 140 : 180,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding:
-                const EdgeInsets.symmetric(horizontal: 50.0, vertical: 10.0),
+                EdgeInsets.symmetric(horizontal: isMobile ? 8.0 : 50.0, vertical: 10.0),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
@@ -485,6 +623,7 @@ class _HistoryCardState extends State<_HistoryCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Focus(
       autofocus: widget.autoFocus,
       onFocusChange: (focused) {
@@ -519,7 +658,7 @@ class _HistoryCardState extends State<_HistoryCard> {
           transform: Matrix4.diagonal3Values(
               _isFocused ? 1.05 : 1.0, _isFocused ? 1.05 : 1.0, 1.0),
           transformAlignment: Alignment.center,
-          width: 250,
+          width: isMobile ? 180 : 250,
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(8),
@@ -607,38 +746,79 @@ class _HistoryCardState extends State<_HistoryCard> {
     bool canDismiss = false;
     Timer(const Duration(milliseconds: 500), () => canDismiss = true);
 
-    showDialog(
+    showGeneralDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Delete History',
-            style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Remove "${widget.item.movieTitle}" from history?',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          _TvDialogButton(
-            text: 'Cancel',
-            autoFocus: true,
-            onPressed: () {
-              if (!canDismiss) return;
-              Navigator.pop(ctx);
-            },
-            isPrimary: false,
+      barrierDismissible: true,
+      barrierLabel: 'DeleteDialog',
+      barrierColor: Colors.black45,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  width: 400,
+                  color: AppColors.surface.withValues(alpha: 0.8),
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Delete History',
+                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Remove "${widget.item.movieTitle}" from history?',
+                        style: const TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          _TvDialogButton(
+                            text: 'Cancel',
+                            autoFocus: true,
+                            onPressed: () {
+                              if (!canDismiss) return;
+                              Navigator.pop(context);
+                            },
+                            isPrimary: false,
+                          ),
+                          const SizedBox(width: 16),
+                          _TvDialogButton(
+                            text: 'Delete',
+                            onPressed: () {
+                              if (!canDismiss) return;
+                              Navigator.pop(context);
+                              widget.onDeletePressed();
+                            },
+                            isPrimary: true,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 16),
-          _TvDialogButton(
-            text: 'Delete',
-            onPressed: () {
-              if (!canDismiss) return;
-              Navigator.pop(ctx);
-              widget.onDeletePressed();
-            },
-            isPrimary: true,
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+            child: child,
           ),
-        ],
-      ),
+        );
+      },
     ).then((_) => _isDialogShowing = false);
   }
 }

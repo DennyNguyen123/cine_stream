@@ -22,6 +22,8 @@ class _SearchScreenState extends State<SearchScreen> {
   final FocusNode _firstFilterFocusNode = FocusNode();
   final FocusNode _firstMovieFocusNode = FocusNode();
   bool _showFilters = false; // Hide filters by default to save space
+  
+  final Map<String, ScrollController> _filterControllers = {};
 
   @override
   void initState() {
@@ -47,6 +49,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    for (var controller in _filterControllers.values) {
+      controller.dispose();
+    }
     _searchFocusNode.dispose();
     _firstFilterFocusNode.dispose();
     _firstMovieFocusNode.dispose();
@@ -261,77 +266,89 @@ class _SearchScreenState extends State<SearchScreen> {
                         child: Column(
                           children: config.fields.map((field) {
                             final selectedValue = currentFilters[field.key] ?? field.defaultValue;
+                            
+                            // Get or create controller
+                            _filterControllers.putIfAbsent(field.key, () => ScrollController());
+                            final controller = _filterControllers[field.key]!;
 
                             return Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
                               child: SizedBox(
-                                height: 44, // Minimum 44pt touch target as per UX guidelines
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: field.options.length,
-                                  itemBuilder: (context, optIndex) {
-                                    final option = field.options[optIndex];
-                                    final isSelected = selectedValue == option.value;
-                                    
-                                    bool isFocused = false;
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 12.0),
-                                      child: StatefulBuilder(
-                                        builder: (context, setState) {
-                                          return Focus(
-                                            focusNode: (config!.fields.indexOf(field) == 0 && optIndex == 0) ? _firstFilterFocusNode : null,
-                                            onFocusChange: (focused) => setState(() => isFocused = focused),
-                                            onKeyEvent: (node, event) {
-                                              if (event is KeyDownEvent &&
-                                                  (event.logicalKey == LogicalKeyboardKey.select ||
-                                                   event.logicalKey == LogicalKeyboardKey.enter)) {
-                                                context.read<SearchCubit>().updateFilter(field.key, option.value);
-                                                return KeyEventResult.handled;
-                                              }
-                                              return KeyEventResult.ignored;
-                                            },
-                                            child: GestureDetector(
-                                              onTap: () {
-                                                context.read<SearchCubit>().updateFilter(field.key, option.value);
-                                              },
-                                              child: AnimatedContainer(
-                                                duration: const Duration(milliseconds: 200),
-                                                curve: Curves.easeOutCubic,
-                                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                                                decoration: BoxDecoration(
-                                                  color: isFocused 
-                                                      ? AppColors.primary 
-                                                      : (isSelected ? Colors.white : AppColors.surface),
-                                                  borderRadius: BorderRadius.circular(24), // pill shape
-                                                  border: Border.all(
-                                                    color: isFocused ? Colors.white : Colors.transparent,
-                                                    width: 2, // Stable layout bounds
-                                                  ),
-                                                  boxShadow: isFocused ? [
-                                                    BoxShadow(
-                                                      color: AppColors.primary.withValues(alpha: 0.6),
-                                                      blurRadius: 10,
-                                                      spreadRadius: 2,
-                                                    )
-                                                  ] : [],
-                                                ),
-                                                child: Center(
-                                                  child: Text(
-                                                    option.label,
-                                                    style: TextStyle(
-                                                      color: isSelected ? Colors.black : (isFocused ? Colors.white : Colors.white70),
-                                                      fontWeight: isSelected || isFocused ? FontWeight.bold : FontWeight.normal,
-                                                      fontSize: 15,
+                                height: 52, // Increased from 44 to fit scrollbar
+                                child: Scrollbar(
+                                  controller: controller,
+                                  thumbVisibility: true,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: ListView.builder(
+                                      controller: controller,
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: field.options.length,
+                                      itemBuilder: (context, optIndex) {
+                                        final option = field.options[optIndex];
+                                        final isSelected = selectedValue == option.value;
+                                        
+                                        bool isFocused = false;
+                                        return Padding(
+                                          padding: const EdgeInsets.only(right: 12.0),
+                                          child: StatefulBuilder(
+                                            builder: (context, setState) {
+                                              return Focus(
+                                                focusNode: (config!.fields.indexOf(field) == 0 && optIndex == 0) ? _firstFilterFocusNode : null,
+                                                onFocusChange: (focused) => setState(() => isFocused = focused),
+                                                onKeyEvent: (node, event) {
+                                                  if (event is KeyDownEvent &&
+                                                      (event.logicalKey == LogicalKeyboardKey.select ||
+                                                       event.logicalKey == LogicalKeyboardKey.enter)) {
+                                                    context.read<SearchCubit>().updateFilter(field.key, option.value);
+                                                    return KeyEventResult.handled;
+                                                  }
+                                                  return KeyEventResult.ignored;
+                                                },
+                                                child: GestureDetector(
+                                                  onTap: () {
+                                                    context.read<SearchCubit>().updateFilter(field.key, option.value);
+                                                  },
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(milliseconds: 200),
+                                                    curve: Curves.easeOutCubic,
+                                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                                    decoration: BoxDecoration(
+                                                      color: isFocused 
+                                                          ? AppColors.primary 
+                                                          : (isSelected ? Colors.white : AppColors.surface),
+                                                      borderRadius: BorderRadius.circular(24), // pill shape
+                                                      border: Border.all(
+                                                        color: isFocused ? Colors.white : Colors.transparent,
+                                                        width: 2, // Stable layout bounds
+                                                      ),
+                                                      boxShadow: isFocused ? [
+                                                        BoxShadow(
+                                                          color: AppColors.primary.withValues(alpha: 0.6),
+                                                          blurRadius: 10,
+                                                          spreadRadius: 2,
+                                                        )
+                                                      ] : [],
+                                                    ),
+                                                    child: Center(
+                                                      child: Text(
+                                                        option.label,
+                                                        style: TextStyle(
+                                                          color: isSelected ? Colors.black : (isFocused ? Colors.white : Colors.white70),
+                                                          fontWeight: isSelected || isFocused ? FontWeight.bold : FontWeight.normal,
+                                                          fontSize: 15,
+                                                        ),
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      ),
-                                    );
-                                  },
+                                              );
+                                            }
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
                               ),
                             );

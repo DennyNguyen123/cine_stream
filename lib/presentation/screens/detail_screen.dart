@@ -26,6 +26,11 @@ class DetailScreen extends StatefulWidget {
 }
 
 class _DetailScreenState extends State<DetailScreen> {
+  static const int _episodesPerPage = 50;
+  
+  final ScrollController _seasonsScrollController = ScrollController();
+  final ScrollController _pagesScrollController = ScrollController();
+  final ScrollController _episodesScrollController = ScrollController();
   String? _selectedServerId;
   HistoryItem? _historyItem;
   bool _isHistoryLoaded = false;
@@ -35,7 +40,6 @@ class _DetailScreenState extends State<DetailScreen> {
   int? _selectedSeason;
   int _selectedPage = 0;
   bool _isPaginationInitialized = false;
-  static const int _episodesPerPage = 50;
 
   late final FocusNode _playButtonNode;
   late final FocusNode _firstServerNode;
@@ -56,6 +60,9 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   void dispose() {
+    _seasonsScrollController.dispose();
+    _pagesScrollController.dispose();
+    _episodesScrollController.dispose();
     _playButtonNode.dispose();
     _firstServerNode.dispose();
     _firstSeasonNode.dispose();
@@ -191,6 +198,7 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return BlocProvider(
       create: (context) => getIt<DetailCubit>()..loadDetail(widget.movie.id),
       child: BlocListener<DetailCubit, DetailState>(
@@ -274,11 +282,11 @@ class _DetailScreenState extends State<DetailScreen> {
                     // Content
                     Positioned.fill(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.only(
-                          left: 58.0,
-                          top: 48.0,
-                          right: 48.0,
-                          bottom: 48.0,
+                        padding: EdgeInsets.only(
+                          left: isMobile ? 16.0 : 58.0,
+                          top: isMobile ? 24.0 : 48.0,
+                          right: isMobile ? 16.0 : 48.0,
+                          bottom: isMobile ? 24.0 : 48.0,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,15 +355,15 @@ class _DetailScreenState extends State<DetailScreen> {
                             const SizedBox(height: 16),
                             Text(
                               detail.title,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 42,
+                                fontSize: isMobile ? 28 : 42,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 16),
                             SizedBox(
-                              width: 600,
+                              width: isMobile ? double.infinity : 600,
                               child: Builder(
                                 builder: (context) {
                                   bool isFocused = false;
@@ -452,29 +460,26 @@ class _DetailScreenState extends State<DetailScreen> {
                                             isFocused ? 1.05 : 1.0,
                                             1.0,
                                           ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 32,
-                                            vertical: 16,
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: isMobile ? 16 : 32,
+                                            vertical: isMobile ? 12 : 16,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: isFocused
-                                                ? Colors.white
-                                                : AppColors.primary,
-                                            borderRadius: BorderRadius.circular(
-                                              8,
+                                            gradient: isFocused ? const LinearGradient(
+                                              colors: [AppColors.primary, Color(0xFFFF5252)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ) : const LinearGradient(
+                                              colors: [AppColors.primary, AppColors.primary],
                                             ),
-                                            boxShadow: isFocused
-                                                ? [
-                                                    BoxShadow(
-                                                      color: Colors.white
-                                                          .withValues(
-                                                            alpha: 0.5,
-                                                          ),
-                                                      blurRadius: 12,
-                                                      spreadRadius: 2,
-                                                    ),
-                                                  ]
-                                                : [],
+                                            borderRadius: BorderRadius.circular(8),
+                                            boxShadow: isFocused ? [
+                                              BoxShadow(
+                                                color: AppColors.primary.withValues(alpha: 0.8),
+                                                blurRadius: 20,
+                                                spreadRadius: 4,
+                                              )
+                                            ] : [],
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
@@ -490,11 +495,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                               Text(
                                                 _getContinueWatchingText(detail),
                                                 style: TextStyle(
-                                                  fontSize: 18,
+                                                  fontSize: isMobile ? 16 : 18,
                                                   fontWeight: FontWeight.bold,
-                                                  color: isFocused
-                                                      ? AppColors.background
-                                                      : Colors.white,
+                                                  color: Colors.white,
                                                 ),
                                               ),
                                             ],
@@ -567,86 +570,22 @@ class _DetailScreenState extends State<DetailScreen> {
                                                     });
                                                   },
                                                   child: AnimatedContainer(
-                                                    duration: const Duration(
-                                                      milliseconds: 200,
-                                                    ),
-                                                    transform:
-                                                        Matrix4.diagonal3Values(
-                                                          isFocused
-                                                              ? 1.05
-                                                              : 1.0,
-                                                          isFocused
-                                                              ? 1.05
-                                                              : 1.0,
-                                                          1.0,
-                                                        ),
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 16,
-                                                          vertical: 8,
-                                                        ),
+                                                    duration: const Duration(milliseconds: 200),
+                                                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: isMobile ? 6 : 8),
                                                     decoration: BoxDecoration(
-                                                      color: isSelected
-                                                          ? (isFocused
-                                                                ? Colors.white
-                                                                : AppColors
-                                                                      .primary)
-                                                          : (isFocused
-                                                                ? Colors.white24
-                                                                : AppColors
-                                                                      .surface),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            20,
-                                                          ),
+                                                      color: isFocused ? Colors.white : (isSelected ? AppColors.primary : AppColors.surface),
+                                                      borderRadius: BorderRadius.circular(20),
                                                       border: Border.all(
-                                                        color: isFocused
-                                                            ? Colors.white
-                                                            : (isSelected
-                                                                  ? AppColors
-                                                                        .primary
-                                                                  : Colors
-                                                                        .transparent),
+                                                        color: isFocused ? Colors.white : Colors.transparent,
                                                         width: 2,
                                                       ),
-                                                      boxShadow: isFocused
-                                                          ? [
-                                                              BoxShadow(
-                                                                color:
-                                                                    (isSelected
-                                                                            ? AppColors.primary
-                                                                            : Colors.white)
-                                                                        .withValues(
-                                                                          alpha:
-                                                                              0.5,
-                                                                        ),
-                                                                blurRadius: 10,
-                                                                spreadRadius: 2,
-                                                              ),
-                                                            ]
-                                                          : [],
                                                     ),
                                                     child: Center(
                                                       child: Text(
                                                         server.name,
                                                         style: TextStyle(
-                                                          color: isSelected
-                                                              ? (isFocused
-                                                                    ? AppColors
-                                                                          .background
-                                                                    : Colors
-                                                                          .white)
-                                                              : (isFocused
-                                                                    ? Colors
-                                                                          .white
-                                                                    : Colors
-                                                                          .white70),
-                                                          fontWeight:
-                                                              isSelected ||
-                                                                  isFocused
-                                                              ? FontWeight.bold
-                                                              : FontWeight
-                                                                    .normal,
+                                                          color: isFocused ? AppColors.background : Colors.white,
+                                                          fontWeight: isSelected || isFocused ? FontWeight.bold : FontWeight.normal,
                                                         ),
                                                       ),
                                                     ),
@@ -700,11 +639,17 @@ class _DetailScreenState extends State<DetailScreen> {
                                       // Season Selector
                                       if (seasons.length > 1) ...[
                                         SizedBox(
-                                          height: 40,
-                                          child: ListView.builder(
-                                            scrollDirection: Axis.horizontal,
-                                            itemCount: seasons.length,
-                                            itemBuilder: (context, index) {
+                                          height: 48,
+                                          child: Scrollbar(
+                                            controller: _seasonsScrollController,
+                                            thumbVisibility: true,
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(bottom: 8.0),
+                                              child: ListView.builder(
+                                                controller: _seasonsScrollController,
+                                                scrollDirection: Axis.horizontal,
+                                                itemCount: seasons.length,
+                                                itemBuilder: (context, index) {
                                               final season = seasons[index];
                                               final isSelected = season == _selectedSeason;
                                               return Padding(
@@ -740,17 +685,25 @@ class _DetailScreenState extends State<DetailScreen> {
                                             },
                                           ),
                                         ),
+                                        ),
+                                        ),
                                         const SizedBox(height: 16),
                                       ],
                                       
                                       // Page Selector
                                       if (totalPages > 1) ...[
                                         SizedBox(
-                                          height: 40,
-                                          child: ListView.builder(
-                                            scrollDirection: Axis.horizontal,
-                                            itemCount: totalPages,
-                                            itemBuilder: (context, index) {
+                                          height: 48,
+                                          child: Scrollbar(
+                                            controller: _pagesScrollController,
+                                            thumbVisibility: true,
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(bottom: 8.0),
+                                              child: ListView.builder(
+                                                controller: _pagesScrollController,
+                                                scrollDirection: Axis.horizontal,
+                                                itemCount: totalPages,
+                                                itemBuilder: (context, index) {
                                               final startIdx = index * _episodesPerPage;
                                               final endIdx = (index + 1) * _episodesPerPage;
                                               final actualEndIdx = endIdx > seasonEpisodes.length ? seasonEpisodes.length : endIdx;
@@ -790,16 +743,24 @@ class _DetailScreenState extends State<DetailScreen> {
                                             },
                                           ),
                                         ),
+                                        ),
+                                        ),
                                         const SizedBox(height: 16),
                                       ],
                                       
                                       // Episodes List
                                       SizedBox(
-                                        height: 120,
-                                        child: ListView.builder(
-                                          scrollDirection: Axis.horizontal,
-                                          itemCount: pageEpisodes.length,
-                                          itemBuilder: (context, index) {
+                                        height: 136,
+                                        child: Scrollbar(
+                                          controller: _episodesScrollController,
+                                          thumbVisibility: true,
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(bottom: 16.0),
+                                            child: ListView.builder(
+                                              controller: _episodesScrollController,
+                                              scrollDirection: Axis.horizontal,
+                                              itemCount: pageEpisodes.length,
+                                              itemBuilder: (context, index) {
                                             final ep = pageEpisodes[index];
                                             return _buildEpisodeItem(
                                               ep,
@@ -808,6 +769,8 @@ class _DetailScreenState extends State<DetailScreen> {
                                             );
                                           },
                                         ),
+                                      ),
+                                      ),
                                       ),
                                     ],
                                   );
@@ -1268,14 +1231,19 @@ class _DetailScreenState extends State<DetailScreen> {
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? (isFocused ? Colors.white : AppColors.primary)
-                        : (isFocused ? Colors.white24 : Colors.black45),
+                    color: isFocused ? Colors.white : (isSelected ? AppColors.primary : AppColors.surface),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isFocused ? Colors.white : Colors.transparent,
                       width: 2,
                     ),
+                    boxShadow: isFocused ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.6),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      )
+                    ] : [],
                   ),
                   child: Center(
                     child: Text(

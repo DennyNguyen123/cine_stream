@@ -1,4 +1,4 @@
-package com.kisskh.androidtv.cine_stream
+package com.dennynguyen123.cinestream
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine

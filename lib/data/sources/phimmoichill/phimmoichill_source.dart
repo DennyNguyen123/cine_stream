@@ -253,7 +253,7 @@ class PhimMoiChillSource implements MovieSource {
       id: id,
       title: rawTitle,
       description: rawDesc,
-      thumbnail: data['thumbnail'] ?? 'https://phimmoichill.live/favicon.ico',
+      thumbnail: data['thumbnail'] ?? 'https://phimmoi.cc/favicon.ico',
       type: '',
       episodes: episodes,
       servers: servers,

@@ -33,6 +33,7 @@ class MovieRowState extends State<MovieRow> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return FocusTraversalGroup(
       policy: OrderedTraversalPolicy(),
       child: Column(
@@ -40,7 +41,7 @@ class MovieRowState extends State<MovieRow> {
         children: [
           if (widget.title != null && widget.title!.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 58.0),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 16.0 : 58.0),
               child: Text(
                 widget.title!,
                 style: const TextStyle(
@@ -52,12 +53,12 @@ class MovieRowState extends State<MovieRow> {
             ),
           const SizedBox(height: 16),
           SizedBox(
-            height: 240,
+            height: isMobile ? 180 : 240,
             child: ListView.builder(
               controller: widget.scrollController,
               clipBehavior: Clip.none,
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 50.0, vertical: 10.0),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8.0 : 50.0, vertical: 10.0),
               itemCount: widget.movies.length,
               itemBuilder: (context, index) {
                 final movie = widget.movies[index];

@@ -8,8 +8,8 @@ import 'phimmoichill_models.dart';
 
 class PhimMoiChillApi {
   final Dio _dio;
-  final String _baseUrl = 'https://phimmoichill.live';
-  final String _apiUrl = 'https://cdn.phimmoichill.live/api/v1';
+  final String _baseUrl = 'https://phimmoi.cc';
+  final String _apiUrl = 'https://cdn.phimmoi.cc/api/v1';
 
   PhimMoiChillApi(this._dio);
 
@@ -324,7 +324,7 @@ class PhimMoiChillApi {
             if (mDecoded.endsWith('.m3u8') && mDecoded.startsWith('http')) {
               return mDecoded;
             } else if (mDecoded.startsWith('/api/v1/media-proxy')) {
-              final proxyUrl = 'https://cdn.phimmoichill.live$mDecoded';
+              final proxyUrl = 'https://cdn.phimmoi.cc$mDecoded';
               debugPrint(
                 'PhimMoiChillApi getStreamUrl: fetching proxy data from $proxyUrl',
               );

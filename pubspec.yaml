@@ -68,6 +68,15 @@ dependencies:
   html: ^0.15.6
   pointycastle: ^3.9.1
   flutter_inappwebview: ^6.1.5
+  video_player_media_kit: ^1.0.7
+  webdav_client: ^1.2.0
+  dartssh2: ^2.0.1
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^3.5.6
+  http: ^1.2.0
+  url_launcher: ^6.3.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -81,10 +90,14 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.13.1
+  change_app_package_name: ^1.5.0
 
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
+  windows:
+    generate: true
+    image_path: "assets/icon.png"
   image_path: "assets/icon.png"
   min_sdk_android: 21
 

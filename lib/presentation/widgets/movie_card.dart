@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../domain/entities/movie.dart';
 import '../../../core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'marquee_text.dart';
 
 import '../../../domain/repositories/source_manager.dart';
@@ -33,6 +34,7 @@ class _MovieCardState extends State<MovieCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Focus(
       focusNode: widget.focusNode,
       autofocus: widget.autoFocus,
@@ -60,8 +62,8 @@ class _MovieCardState extends State<MovieCard> {
           scale: _isFocused ? 1.08 : 1.0,
           duration: const Duration(milliseconds: 200),
           child: Container(
-            width: 140,
-            height: 210,
+            width: isMobile ? 110 : 140,
+            height: isMobile ? 165 : 210,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
@@ -101,10 +103,27 @@ class _MovieCardState extends State<MovieCard> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withValues(alpha:0.4),
-                          Colors.black.withValues(alpha:0.9),
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.6),
+                          Colors.black.withValues(alpha: 0.95),
                         ],
-                        stops: const [0.0, 0.6, 1.0],
+                        stops: const [0.0, 0.4, 0.7, 1.0],
+                      ),
+                    ),
+                  ),
+
+                  // Hover Play Icon Overlay
+                  AnimatedOpacity(
+                    opacity: _isFocused ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      child: Center(
+                        child: Icon(
+                          Icons.play_circle_fill,
+                          size: 48,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
                       ),
                     ),
                   ),
@@ -193,19 +212,25 @@ class _MovieCardState extends State<MovieCard> {
   }
 
   Widget _buildBadge(String text, {Color color = Colors.white70}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 0.5),
-      ),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          color: color,
-          fontSize: 8,
-          fontWeight: FontWeight.bold,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: color.withValues(alpha: 0.5), width: 0.5),
+          ),
+          child: Text(
+            text.toUpperCase(),
+            style: TextStyle(
+              color: color,
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
       ),
     );

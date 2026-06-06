@@ -18,6 +18,9 @@ class TvControls extends StatefulWidget {
   final VoidCallback? onPrevEpisode;
   final VoidCallback? onNextEpisode;
   final ValueChanged<int>? onSeek;
+  final ValueChanged<double>? onDragStart;
+  final ValueChanged<double>? onDragUpdate;
+  final ValueChanged<double>? onDragEnd;
 
   const TvControls({
     super.key,
@@ -35,6 +38,9 @@ class TvControls extends StatefulWidget {
     this.onPrevEpisode,
     this.onNextEpisode,
     this.onSeek,
+    this.onDragStart,
+    this.onDragUpdate,
+    this.onDragEnd,
   });
 
   @override
@@ -146,6 +152,9 @@ class _TvControlsState extends State<TvControls> {
                     position: widget.position,
                     duration: widget.duration,
                     onSeek: widget.onSeek,
+                    onDragStart: widget.onDragStart,
+                    onDragUpdate: widget.onDragUpdate,
+                    onDragEnd: widget.onDragEnd,
                     upFocusNode: _playPauseNode,
                   ),
                 ),
@@ -275,12 +284,18 @@ class _TvSlider extends StatefulWidget {
   final Duration position;
   final Duration duration;
   final Function(int)? onSeek;
+  final Function(double)? onDragStart;
+  final Function(double)? onDragUpdate;
+  final Function(double)? onDragEnd;
   final FocusNode? upFocusNode;
 
   const _TvSlider({
     required this.position,
     required this.duration,
     this.onSeek,
+    this.onDragStart,
+    this.onDragUpdate,
+    this.onDragEnd,
     this.upFocusNode,
   });
 
@@ -329,9 +344,15 @@ class _TvSliderState extends State<_TvSlider> {
           ),
           child: ExcludeFocus(
             child: Slider(
-              value: widget.position.inSeconds.toDouble(),
+              value: widget.position.inSeconds.toDouble().clamp(0.0, widget.duration.inSeconds.toDouble() > 0 ? widget.duration.inSeconds.toDouble() : 1.0),
               max: widget.duration.inSeconds.toDouble() > 0 ? widget.duration.inSeconds.toDouble() : 1.0,
-              onChanged: (val) {}, // Read-only for TV, seek via buttons
+              onChangeStart: widget.onDragStart,
+              onChanged: (val) {
+                if (widget.onDragUpdate != null) {
+                  widget.onDragUpdate!(val);
+                }
+              },
+              onChangeEnd: widget.onDragEnd,
             ),
           ),
         ),

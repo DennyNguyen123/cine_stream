@@ -130,27 +130,40 @@ class FeaturedBanner extends StatelessWidget {
                           transformAlignment: Alignment.center,
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           decoration: BoxDecoration(
-                            color: isFocused ? AppColors.primary : Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: isFocused ? Colors.white : Colors.transparent,
-                              width: 2,
+                            gradient: isFocused ? const LinearGradient(
+                              colors: [AppColors.primary, Color(0xFFFF5252)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ) : const LinearGradient(
+                              colors: [Colors.white, Colors.white],
                             ),
+                            borderRadius: BorderRadius.circular(8),
                             boxShadow: isFocused ? [
                               BoxShadow(
                                 color: AppColors.primary.withValues(alpha: 0.6),
-                                blurRadius: 15,
-                                spreadRadius: 2,
+                                blurRadius: 20,
+                                spreadRadius: 4,
                               )
                             ] : [],
                           ),
-                          child: Text(
-                            'Watch Now',
-                            style: TextStyle(
-                              color: isFocused ? Colors.white : Colors.black,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.play_arrow,
+                                color: isFocused ? Colors.white : Colors.black,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Watch Now',
+                                style: TextStyle(
+                                  color: isFocused ? Colors.white : Colors.black,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
