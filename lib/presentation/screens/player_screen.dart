@@ -17,10 +17,12 @@ import '../../data/repositories/translation_service.dart';
 import '../../data/repositories/external_subtitle_repository.dart';
 import '../../data/repositories/history_repository.dart';
 import '../../domain/repositories/movie_source.dart';
+import '../../domain/repositories/subtitle_repository.dart';
 import '../../di/injection.dart';
 import '../widgets/player_settings_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/repositories/source_manager.dart';
+import '../../data/services/log_service.dart';
 
 class PlayerScreen extends StatefulWidget {
   final StreamInfo streamInfo;
@@ -106,8 +108,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       DeviceOrientation.landscapeRight,
     ]);
     
-      print('[PlayerScreen] Initializing with videoUrl: ${widget.streamInfo.videoUrl}');
-      print('[PlayerScreen] Initializing with headers: ${widget.streamInfo.headers}');
+      getIt<LogService>().log('[PlayerScreen] Initializing with videoUrl: ${widget.streamInfo.videoUrl}');
+      getIt<LogService>().log('[PlayerScreen] Initializing with headers: ${widget.streamInfo.headers}');
       
       // DIAGNOSTIC TEST: Let's see if Dart http gets 404 or 200
       () async {
@@ -122,10 +124,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
           final response = await request.close();
           final bodyBytes = await response.map((chunk) => chunk).toList();
           final bodyString = String.fromCharCodes(bodyBytes.expand((x) => x).take(500));
-          print('[PlayerScreen] DIAGNOSTIC HTTP TEST: ${response.statusCode}');
-          print('[PlayerScreen] DIAGNOSTIC HTTP BODY: $bodyString');
-        } catch (e) {
-          print('[PlayerScreen] DIAGNOSTIC HTTP TEST FAILED: $e');
+          getIt<LogService>().log('[PlayerScreen] DIAGNOSTIC HTTP TEST: ${response.statusCode}');
+          getIt<LogService>().log('[PlayerScreen] DIAGNOSTIC HTTP BODY: $bodyString');
+        } catch (e, stack) {
+          getIt<LogService>().error('[PlayerScreen] DIAGNOSTIC HTTP TEST FAILED', e, stack);
         }
       }();
 
@@ -152,8 +154,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
         }
         _controller.setPlaybackSpeed(_playbackSpeed);
         _controller.play();
-      }).catchError((e) {
+      }).catchError((e, stack) {
         if (!mounted) return;
+        getIt<LogService>().error('Player initialization failed', e, stack);
         _showErrorDialog("Player initialization failed:\n${e.toString()}");
       });
 
@@ -272,8 +275,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _fetchSubtitles(SubtitleTrack sub, bool isTop) async {
     try {
-      final response = await Dio().get(sub.src);
-      final parsedCues = SubtitleParser.parse(response.data.toString());
+      final subRepo = getIt<SubtitleRepository>();
+      final content = await subRepo.getSubtitleContent(sub.src);
+      
+      if (content == null || content.isEmpty) {
+        throw Exception("Failed to fetch subtitle content from ${sub.src}");
+      }
+      
+      final parsedCues = SubtitleParser.parse(content);
       
       if (mounted) {
         setState(() {
@@ -288,7 +297,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Subtitle fetch error: $e');
+      debugPrint('Subtitle fetch error for ${sub.src}: $e');
+      final baseLang = _getBaseLanguage(sub).toLowerCase();
+      final tracks = _availableSubtitles.where((s) => _getBaseLanguage(s).toLowerCase() == baseLang).toList();
+      final currentIndex = tracks.indexWhere((s) => s.src == sub.src);
+      if (currentIndex != -1 && currentIndex + 1 < tracks.length) {
+         debugPrint('Falling back to next subtitle track for $baseLang...');
+         _fetchSubtitles(tracks[currentIndex + 1], isTop);
+      } else {
+         if (mounted) _showToast('Subtitle failed to load.');
+      }
     }
   }
 
@@ -568,7 +586,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             onPressed: () {
               Navigator.pop(context);
               setState(() => _errorDialogShowing = false);
-              _handleBackPress();
+              _exitPlayer();
             },
             child: const Text('Exit', style: TextStyle(color: Colors.white)),
           ),
@@ -671,17 +689,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
        return;
     }
 
-    if (_showControls) {
-       setState(() => _showControls = false);
-       _playerFocusNode.requestFocus();
-       return;
-    }
-
     _backPressCount++;
     if (_backPressCount >= 2) {
       _exitPlayer();
     } else {
-      _showToast('Bấm Back lần nữa để thoát');
+      if (_showControls) {
+         setState(() => _showControls = false);
+         _playerFocusNode.requestFocus();
+      } else {
+         _showToast('Bấm Back lần nữa để thoát');
+      }
       _backPressTimer?.cancel();
       _backPressTimer = Timer(const Duration(seconds: 2), () {
         _backPressCount = 0;
@@ -1093,7 +1110,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         );
                       },
                       onBack: () {
-                        _handleBackPress();
+                        _exitPlayer();
                       },
                     );
                   }
@@ -1234,22 +1251,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
       child: Row(
         children: [
           Expanded(
-            flex: 2,
-            child: ListTile(
-              title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 13)),
-              subtitle: Text(currentLanguage, style: const TextStyle(color: Colors.white70)),
+            flex: 5,
+            child: InkWell(
               onTap: () {
                 Navigator.pop(context);
                 _showLanguageSelector(context, isTop);
               },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Text(currentLanguage, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
             ),
           ),
           Expanded(
-            flex: 1,
+            flex: 4,
             child: (sub != null && maxTracks > 0) 
-              ? ListTile(
-                  title: Text(isTranslating ? 'Source' : 'Track', style: const TextStyle(color: Colors.white, fontSize: 13)),
-                  subtitle: Text(isTranslating ? sourceLangStr : 'Track ${trackIndex + 1}', style: const TextStyle(color: Colors.white70)),
+              ? InkWell(
                   onTap: (isTranslating || maxTracks > 1) 
                       ? () {
                           Navigator.pop(context);
@@ -1260,6 +1285,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           }
                         }
                       : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(isTranslating ? 'Source' : 'Track', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 2),
+                        Text(isTranslating ? sourceLangStr : 'Track ${trackIndex + 1}', style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis, maxLines: 2),
+                      ],
+                    ),
+                  ),
                 )
               : const SizedBox.shrink(),
           ),

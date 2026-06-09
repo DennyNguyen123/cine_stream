@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/repositories/history_repository.dart';
 import '../data/services/webdav_service.dart';
+import '../data/services/log_service.dart';
 
 import '../data/repositories/subtitle_repository_impl.dart';
 import '../data/repositories/translation_service.dart';
@@ -47,6 +48,8 @@ Future<void> setupInjection() async {
     folderPath: prefs.getString('cinestream_webdav_path') ?? '/CineStream',
   );
   getIt.registerLazySingleton<WebDAVService>(() => webdavService);
+  
+  getIt.registerLazySingleton<LogService>(() => LogService());
   
   // Sources
   getIt.registerLazySingleton(() => KissKhApi(getIt()));

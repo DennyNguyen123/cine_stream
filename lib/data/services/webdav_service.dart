@@ -78,4 +78,16 @@ class WebDAVService {
       return false;
     }
   }
+
+  Future<bool> uploadLog(String logContent, String fileName) async {
+    if (_client == null) return false;
+    try {
+      await _ensureFolderExists();
+      final bytes = utf8.encode(logContent);
+      await _client!.write('$_syncFolder/$fileName', Uint8List.fromList(bytes));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 }

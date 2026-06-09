@@ -202,8 +202,13 @@ class CinemetaSource implements MovieSource {
   }
 
   static String? extractTmdbId(String html) {
-    final regex = RegExp(r'https://sub\.vdrk\.site/(?:v2/)?(?:movie|tv)/([^/"]+)');
-    final match = regex.firstMatch(html);
+    var regex = RegExp(r'https://sub\.vdrk\.site/(?:v2/)?(?:movie|tv)/([^/"]+)');
+    var match = regex.firstMatch(html);
+    if (match != null) return match.group(1);
+    
+    // Fallback: extract from iframe params
+    regex = RegExp(r'tmdb=(\d+)');
+    match = regex.firstMatch(html);
     return match?.group(1);
   }
 

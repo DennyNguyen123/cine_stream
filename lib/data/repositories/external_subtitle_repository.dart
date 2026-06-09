@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'dart:convert';
 import '../../domain/entities/subtitle.dart';
 
 class ExternalSubtitleRepository {
@@ -18,45 +19,70 @@ class ExternalSubtitleRepository {
         debugPrint('Stremio addons usually require IMDb ID starting with tt. Got: $imdbId');
         return [];
       }
-      
-      String url;
-      if (season != null && episode != null) {
-        url = 'https://opensubtitles-v3.strem.io/subtitles/series/$imdbId:$season:$episode.json';
-      } else {
-        url = 'https://opensubtitles-v3.strem.io/subtitles/movie/$imdbId.json';
-      }
-      
-      debugPrint('Fetching external subs from: $url');
-      final response = await _dio.get(url);
-      
-      if (response.statusCode == 200 && response.data['subtitles'] != null) {
-        final List<SubtitleTrack> tracks = [];
-        final results = response.data['subtitles'] as List;
-        final Map<String, int> langCounts = {};
-        
-        for (var i = 0; i < results.length; i++) {
-          final sub = results[i];
-          final rawLang = sub['lang']?.toString().toLowerCase() ?? 'unknown';
-          final langName = _getLanguageName(rawLang);
-          final link = sub['url'];
+
+      final isTv = season != null && episode != null;
+      final path = isTv ? 'series/$imdbId:$season:$episode.json' : 'movie/$imdbId.json';
+
+      // Fallback list of Stremio Subtitle Addon APIs
+      final sources = [
+        'https://opensubtitles-v3.strem.io/subtitles/$path',
+        'https://opensubtitles.strem.io/subtitles/$path', // v2 API fallback
+        if (!isTv) 'https://yifysubtitles.strem.io/subtitles/$path', // YTS (movies only)
+      ];
+
+      for (final url in sources) {
+        try {
+          debugPrint('Fetching external subs from: $url');
+          final response = await _dio.get(
+            url,
+            options: Options(
+              sendTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 15),
+            ),
+          );
           
-          if (link != null) {
-            langCounts[langName] = (langCounts[langName] ?? 0) + 1;
-            final count = langCounts[langName]!;
+          if (response.statusCode == 200 && response.data != null) {
+            dynamic data = response.data;
+            if (data is String) {
+               data = jsonDecode(data);
+            }
             
-            tracks.add(SubtitleTrack(
-              id: 2000 + i, // Offset to avoid ID collision
-              label: count == 1 ? langName : '$langName $count',
-              src: link,
-            ));
+            if (data is Map && data['subtitles'] != null) {
+              final List<SubtitleTrack> tracks = [];
+              final results = data['subtitles'] as List;
+              final Map<String, int> langCounts = {};
+              
+              for (var i = 0; i < results.length; i++) {
+                final sub = results[i];
+                final rawLang = sub['lang']?.toString().toLowerCase() ?? 'unknown';
+                final langName = _getLanguageName(rawLang);
+                final link = sub['url'];
+                
+                if (link != null) {
+                  langCounts[langName] = (langCounts[langName] ?? 0) + 1;
+                  final count = langCounts[langName]!;
+                  
+                  tracks.add(SubtitleTrack(
+                    id: 2000 + i, // Offset to avoid ID collision
+                    label: count == 1 ? langName : '$langName $count',
+                    src: link,
+                  ));
+                }
+              }
+              
+              if (tracks.isNotEmpty) {
+                debugPrint('Found ${tracks.length} subtitles from $url');
+                return tracks;
+              }
+            }
           }
+        } catch (e) {
+          debugPrint('Error fetching external subtitles from $url: $e');
+          // Ignore error and try the next source
         }
-        
-        // Optionally sort so that English and Vietnamese are at the top, or just keep original order
-        return tracks;
       }
     } catch (e) {
-      debugPrint('Error fetching external subtitles: $e');
+      debugPrint('Error in getSubtitles: $e');
     }
     
     return [];
@@ -111,4 +137,3 @@ class ExternalSubtitleRepository {
     return map[code] ?? code.toUpperCase();
   }
 }
-

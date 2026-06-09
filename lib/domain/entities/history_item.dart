@@ -11,6 +11,7 @@ class HistoryItem {
   final int timestamp;
   final String sourceId;
   final String? serverId;
+  final bool isDeleted;
 
   const HistoryItem({
     required this.movieId,
@@ -23,6 +24,7 @@ class HistoryItem {
     required this.timestamp,
     required this.sourceId,
     this.serverId,
+    this.isDeleted = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -37,6 +39,7 @@ class HistoryItem {
       'timestamp': timestamp,
       'sourceId': sourceId,
       'serverId': serverId,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -52,6 +55,7 @@ class HistoryItem {
       timestamp: map['timestamp']?.toInt() ?? 0,
       sourceId: map['sourceId'] ?? 'kisskh',
       serverId: map['serverId'],
+      isDeleted: map['isDeleted'] == true,
     );
   }
 
@@ -70,6 +74,7 @@ class HistoryItem {
     int? timestamp,
     String? sourceId,
     String? serverId,
+    bool? isDeleted,
   }) {
     return HistoryItem(
       movieId: movieId ?? this.movieId,
@@ -82,6 +87,7 @@ class HistoryItem {
       timestamp: timestamp ?? this.timestamp,
       sourceId: sourceId ?? this.sourceId,
       serverId: serverId ?? this.serverId,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

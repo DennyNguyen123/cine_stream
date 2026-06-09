@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/webdav_service.dart';
+import '../../../data/services/log_service.dart';
 import '../../../di/injection.dart';
 import '../../bloc/history/history_cubit.dart';
 import 'mobile_sync_screen.dart';
@@ -86,6 +87,48 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
+              "Quick Sync via QR",
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    autofocus: true,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: Colors.white24),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.qr_code, color: Colors.white),
+                    label: const Text("Show QR", style: TextStyle(color: Colors.white)),
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const TvSyncScreen()));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: Colors.white24),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+                    label: const Text("Scan QR", style: TextStyle(color: Colors.white)),
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MobileSyncScreen()));
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            const Divider(color: Colors.white24),
+            const SizedBox(height: 24),
+            const Text(
               "Enter your WebDAV details (Alist, Nextcloud...) to sync watch history.",
               style: TextStyle(color: Colors.white70, fontSize: 16),
             ),
@@ -151,47 +194,31 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                   : const Text("Connect & Save", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
             ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white24),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  final logService = getIt<LogService>();
+                  final success = await logService.uploadManual();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(success ? 'Logs uploaded successfully!' : 'Failed to upload logs. Ensure WebDAV is connected.'),
+                        backgroundColor: success ? Colors.green : Colors.red,
+                      ),
+                    );
+                  }
+                },
+                child: const Text("Upload Logs to WebDAV", style: TextStyle(fontSize: 16, color: Colors.white)),
+              ),
+            ),
             const SizedBox(height: 32),
-            const Divider(color: Colors.white24),
-            const SizedBox(height: 16),
-            const Text(
-              "Quick Sync via QR",
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Colors.white24),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.qr_code, color: Colors.white),
-                    label: const Text("Show QR", style: TextStyle(color: Colors.white)),
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const TvSyncScreen()));
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Colors.white24),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-                    label: const Text("Scan QR", style: TextStyle(color: Colors.white)),
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MobileSyncScreen()));
-                    },
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
