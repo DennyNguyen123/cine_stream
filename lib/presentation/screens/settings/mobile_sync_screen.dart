@@ -39,6 +39,11 @@ class _MobileSyncScreenState extends State<MobileSyncScreen> {
       "user": prefs.getString('cinestream_webdav_user') ?? "", 
       "pass": prefs.getString('cinestream_webdav_pass') ?? "",
       "path": prefs.getString('cinestream_webdav_path') ?? "/CineStream",
+      "tts_engine": prefs.getString('tts_engine') ?? "native",
+      "tts_base_url": prefs.getString('tts_base_url') ?? "",
+      "tts_api_key": prefs.getString('tts_api_key') ?? "",
+      "tts_model": prefs.getString('tts_model') ?? "tts-1",
+      "tts_voice": prefs.getString('tts_voice') ?? "alloy",
     }); 
     
     try {

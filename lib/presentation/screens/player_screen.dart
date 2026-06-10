@@ -8,6 +8,9 @@ import '../../core/theme/app_colors.dart';
 import '../widgets/tv_controls.dart';
 import 'package:dio/dio.dart';
 import '../widgets/subtitle_display.dart';
+import '../widgets/subtitle_settings.dart';
+import '../widgets/tv_controls.dart';
+import '../widgets/volume_mixer_dialog.dart';
 import '../../domain/entities/stream_info.dart';
 import '../../domain/entities/subtitle.dart';
 import '../../domain/entities/history_item.dart';
@@ -25,6 +28,9 @@ import '../../domain/repositories/source_manager.dart';
 import '../../data/services/log_service.dart';
 import '../../core/utils/stream_info_cache.dart';
 import '../widgets/debug_overlay.dart';
+
+import '../../domain/services/tts_service.dart';
+import './settings/webdav_setup_screen.dart';
 
 class PlayerScreen extends StatefulWidget {
   final StreamInfo streamInfo;
@@ -58,7 +64,7 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver {
   late VideoPlayerController _controller;
   
   bool _showControls = true;
@@ -102,15 +108,35 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _autoNext = true;
   bool _showDebugStats = false;
   bool _errorDialogShowing = false;
+  
+  bool _isVoiceOverEnabled = false;
+  SubtitleCue? _lastSpokenCue;
+  
+  bool _showSubtitlesText = true;
+  
+  double _videoVolume = 1.0;
+  double _ttsVolume = 1.0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+
+    // Warm up TTS engine
+    getIt<TtsService>().init();
+    
+    final prefs = getIt<SharedPreferences>();
+    _isVoiceOverEnabled = prefs.getBool('cinestream_tts_enabled') ?? false;
+    _showSubtitlesText = prefs.getBool('show_subtitles_text') ?? true;
+    _videoVolume = prefs.getDouble('cinestream_video_volume') ?? 1.0;
+    _ttsVolume = prefs.getDouble('cinestream_tts_volume') ?? 1.0;
+    
+    getIt<TtsService>().setVolume(_ttsVolume);
     
       getIt<LogService>().log('[PlayerScreen] Initializing with videoUrl: ${widget.streamInfo.videoUrl}');
       getIt<LogService>().log('[PlayerScreen] Initializing with headers: ${widget.streamInfo.headers}');
@@ -125,6 +151,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
         );
+      } else if (widget.streamInfo.videoUrl.isEmpty) {
+        // Mock controller cho testing
+        _controller = VideoPlayerController.file(File(''));
       } else {
         _controller = VideoPlayerController.file(
           File(widget.streamInfo.videoUrl),
@@ -139,6 +168,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           _controller.seekTo(Duration(milliseconds: widget.startPositionMs));
         }
         _controller.setPlaybackSpeed(_playbackSpeed);
+        _controller.setVolume(_videoVolume);
         _controller.play();
       }).catchError((e, stack) {
         if (!mounted) return;
@@ -146,7 +176,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _showErrorDialog("Player initialization failed:\n${e.toString()}");
       });
 
-    final prefs = getIt<SharedPreferences>();
     _autoNext = prefs.getBool('auto_next') ?? true;
     _playbackSpeed = prefs.getDouble('playback_speed') ?? 1.0;
     _showDebugStats = prefs.getBool('pref_debug_stats') ?? false;
@@ -390,6 +419,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   int _lastPrimaryIndex = 0;
   int _lastSecondaryIndex = 0;
+  int _lastTtsIndex = 0;
+  final Map<String, String> _ttsTranslationCache = {};
 
   int _findActiveCueIndex(List<SubtitleCue> cues, int posMs, int lastIndex) {
     if (cues.isEmpty) return -1;
@@ -454,6 +485,67 @@ class _PlayerScreenState extends State<PlayerScreen> {
         
     // Update position only if controls are visible and position changed by > 500ms
     bool positionChangedSignificantly = _showControls && (_position.inMilliseconds - _controller.value.position.inMilliseconds).abs() > 500;
+
+    // Trigger TTS Voice-over if enabled
+    SubtitleCue? activeTtsCue;
+    if (_primaryCues.isNotEmpty) {
+      final prefs = getIt<SharedPreferences>();
+      final ttsDelayMs = prefs.getDouble('tts_delay_ms') ?? 0.0;
+      final posMsTts = _controller.value.position.inMilliseconds - ttsDelayMs.toInt();
+      
+      _lastTtsIndex = _findActiveCueIndex(_primaryCues, posMsTts, _lastTtsIndex);
+      if (_lastTtsIndex != -1) activeTtsCue = _primaryCues[_lastTtsIndex];
+    }
+
+    if (_isVoiceOverEnabled && activeTtsCue != null && activeTtsCue != _lastSpokenCue && !_isSeeking && _isPlaying) {
+      _lastSpokenCue = activeTtsCue;
+      final duration = activeTtsCue.endMs - activeTtsCue.startMs;
+      
+      final prefs = getIt<SharedPreferences>();
+      final targetLang = prefs.getString('tts_target_lang') ?? 'vi';
+      final currentSubLang = _selectedSub?.languageCode;
+
+      final originalText = activeTtsCue.text;
+      final cleanText = originalText.replaceAll(RegExp(r'\[.*?\]|\(.*?\)', dotAll: true), '').trim();
+      
+      if (cleanText.isNotEmpty) {
+        if (currentSubLang != null && currentSubLang != targetLang) {
+          // Need translation
+          if (_ttsTranslationCache.containsKey(cleanText)) {
+             getIt<TtsService>().speak(
+               _ttsTranslationCache[cleanText]!,
+               durationMs: duration,
+               videoPlaybackSpeed: _playbackSpeed,
+               languageCode: targetLang,
+             );
+          } else {
+             getIt<TranslationService>().translate(cleanText, targetLang: targetLang).then((translated) {
+                if (mounted) {
+                  _ttsTranslationCache[cleanText] = translated;
+                  if (_lastSpokenCue == activeTtsCue && _isPlaying) {
+                    getIt<TtsService>().speak(
+                      translated,
+                      durationMs: duration,
+                      videoPlaybackSpeed: _playbackSpeed,
+                      languageCode: targetLang,
+                    );
+                  }
+                }
+             });
+          }
+        } else {
+          // No translation needed
+          getIt<TtsService>().speak(
+            cleanText,
+            durationMs: duration,
+            videoPlaybackSpeed: _playbackSpeed,
+            languageCode: targetLang,
+          );
+        }
+      }
+    } else if (activeTtsCue == null) {
+      _lastSpokenCue = null;
+    }
 
     if (stateChanged || positionChangedSignificantly) {
       setState(() {
@@ -700,7 +792,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      // Dừng TTS khi ứng dụng đi vào background
+      getIt<TtsService>().stop();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    getIt<TtsService>().dispose();
     _saveHistory(syncWebDav: true);
     _saveHistoryTimer?.cancel();
     _seekDebounceTimer?.cancel();
@@ -997,13 +1100,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
 
               // Subtitles Overlay
-              Positioned.fill(
-                child: DualSubtitleDisplay(
-                  topCue: _currentPrimaryCue,
-                  bottomCue: _currentSecondaryCue,
-                  isDualEnabled: (_selectedSub != null && _selectedSecondarySub != null),
+              if (_showSubtitlesText)
+                Positioned.fill(
+                  child: DualSubtitleDisplay(
+                    topCue: _currentPrimaryCue,
+                    bottomCue: _currentSecondaryCue,
+                    isDualEnabled: (_selectedSub != null && _selectedSecondarySub != null),
+                  ),
                 ),
-              ),
 
               // Controls Overlay
               if (_showControls)
@@ -1041,6 +1145,45 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           position: _isSeeking ? _targetSeekPosition : _position,
                           duration: _duration,
                           isBuffering: _isBuffering,
+                          isVoiceOverEnabled: _isVoiceOverEnabled,
+                          onVoiceOverToggle: () async {
+                            final targetState = !_isVoiceOverEnabled;
+                            setState(() {
+                              _isVoiceOverEnabled = targetState;
+                            });
+                            final prefs = getIt<SharedPreferences>();
+                            await prefs.setBool('cinestream_tts_enabled', targetState);
+                            if (!targetState) {
+                              await getIt<TtsService>().stop();
+                            }
+                          },
+                          onVolumeMixer: () {
+                            showDialog(
+                              context: context,
+                              barrierColor: Colors.transparent,
+                              builder: (_) => Align(
+                                alignment: Alignment.bottomRight,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 24, bottom: 100),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: VolumeMixerDialog(
+                                      initialVideoVolume: _videoVolume,
+                                      initialTtsVolume: _ttsVolume,
+                                      onVideoVolumeChanged: (val) {
+                                        setState(() => _videoVolume = val);
+                                        _controller.setVolume(val);
+                                      },
+                                      onTtsVolumeChanged: (val) {
+                                        setState(() => _ttsVolume = val);
+                                        getIt<TtsService>().setVolume(val);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                           onPrevEpisode: prevEpCallback,
                           onNextEpisode: nextEpCallback,
                           onSeek: (seconds) {
@@ -1051,6 +1194,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 _controller.pause();
                               }
                             }
+                            
+                            // Dừng TTS ngay lập tức khi seek
+                            getIt<TtsService>().stop();
                             
                             _targetSeekPosition += Duration(seconds: seconds);
                             _seekAccumulator += seconds;
@@ -1110,9 +1256,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               _controller.seekTo(_targetSeekPosition).then((_) {
                                 setState(() => _isSeeking = false);
                                 _isPlaying ? _controller.pause() : _controller.play();
+                                if (_isPlaying) {
+                                  getIt<TtsService>().stop();
+                                }
                               });
                             } else {
                               _isPlaying ? _controller.pause() : _controller.play();
+                              if (_isPlaying) {
+                                getIt<TtsService>().stop();
+                              }
                             }
                           },
                       onSubtitleToggle: () {
@@ -1140,6 +1292,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             onDebugModeChanged: (val) {
                               setState(() => _showDebugStats = val);
                               getIt<SharedPreferences>().setBool('pref_debug_stats', val);
+                            },
+                            onVoiceOverSettings: () {
+                              _controller.pause();
+                              Navigator.pop(context); // Close side panel
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const WebdavSetupScreen(),
+                                ),
+                              ).then((_) {
+                                // Khi quay lại từ Settings, reload config của player
+                                final prefs = getIt<SharedPreferences>();
+                                setState(() {
+                                  _isVoiceOverEnabled = prefs.getBool('cinestream_tts_enabled') ?? false;
+                                });
+                              });
                             },
                           ),
                         );
@@ -1255,6 +1423,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       _bottomSubDelayMs = newVal;
                       _videoListener(); // Recalculate cue immediately
                     });
+                  },
+                ),
+                const Divider(color: Colors.white24, height: 1),
+                SwitchListTile(
+                  title: const Text('Show Subtitles Text on Screen', style: TextStyle(color: Colors.white)),
+                  activeColor: AppColors.primary,
+                  value: _showSubtitlesText,
+                  onChanged: (val) {
+                    setDialogState(() => _showSubtitlesText = val);
+                    setState(() => _showSubtitlesText = val);
+                    getIt<SharedPreferences>().setBool('show_subtitles_text', val);
                   },
                 ),
               ],
@@ -1536,10 +1715,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final currentIndex = sortedEpisodes.indexWhere((e) => e.id == widget.episodeId);
     final scrollController = ScrollController(initialScrollOffset: currentIndex > 0 ? currentIndex * 56.0 : 0);
     
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        children: [
+    return Material(
+      color: Colors.transparent,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text('Episodes', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
@@ -1580,6 +1761,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -1592,11 +1774,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
        );
     }
     
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+    return Material(
+      color: Colors.transparent,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text('Select Server', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
@@ -1626,6 +1810,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

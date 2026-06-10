@@ -10,4 +10,7 @@ class AppColors {
   static const focusBorder = Color(0xFFFFFFFF);    // White focus ring
   static const seekBar = Color(0xFFFF0000);        // Red
   static const seekBuffer = Color(0x80FFFFFF);     // Semi-white
+  static const text = Color(0xFFF1F1F1);           // Primary text
+  static const textDim = Color(0xFFAAAAAA);        // Secondary text
+  static const border = Color(0xFF333333);         // Border color
 }

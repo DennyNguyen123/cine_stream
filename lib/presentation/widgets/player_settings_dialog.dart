@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../di/injection.dart';
 import '../../../core/theme/app_colors.dart';
 
 class PlayerSettingsDialog extends StatefulWidget {
@@ -9,6 +11,7 @@ class PlayerSettingsDialog extends StatefulWidget {
   final ValueChanged<double> onSpeedChanged;
   final ValueChanged<bool> onAutoNextChanged;
   final ValueChanged<bool> onDebugModeChanged;
+  final VoidCallback onVoiceOverSettings;
 
   const PlayerSettingsDialog({
     super.key,
@@ -18,6 +21,7 @@ class PlayerSettingsDialog extends StatefulWidget {
     required this.onSpeedChanged,
     required this.onAutoNextChanged,
     required this.onDebugModeChanged,
+    required this.onVoiceOverSettings,
   });
 
   @override
@@ -28,6 +32,8 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
   late double _speed;
   late bool _autoNext;
   late bool _debugMode;
+  String _ttsTargetLang = 'vi';
+  double _ttsDelayMs = 0.0;
 
   final List<double> _speeds = [0.5, 1.0, 1.25, 1.5, 2.0];
 
@@ -37,6 +43,9 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
     _speed = widget.currentSpeed;
     _autoNext = widget.autoNext;
     _debugMode = widget.debugMode;
+    final prefs = getIt<SharedPreferences>();
+    _ttsTargetLang = prefs.getString('tts_target_lang') ?? 'vi';
+    _ttsDelayMs = prefs.getDouble('tts_delay_ms') ?? 0.0;
   }
 
   @override
@@ -86,6 +95,67 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
               });
               widget.onDebugModeChanged(_debugMode);
             },
+          ),
+          const SizedBox(height: 16),
+          
+          // Voice-over Target Language
+          const Text('Voice-over Language', style: TextStyle(color: Colors.white70, fontSize: 16)),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _ttsTargetLang,
+            dropdownColor: AppColors.surface,
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white12,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'vi', child: Text('Vietnamese (vi)')),
+              DropdownMenuItem(value: 'en', child: Text('English (en)')),
+              DropdownMenuItem(value: 'ja', child: Text('Japanese (ja)')),
+              DropdownMenuItem(value: 'ko', child: Text('Korean (ko)')),
+              DropdownMenuItem(value: 'zh', child: Text('Chinese (zh)')),
+            ],
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _ttsTargetLang = val);
+                getIt<SharedPreferences>().setString('tts_target_lang', val);
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Voice-over Delay
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Voice-over Delay', style: TextStyle(color: Colors.white70, fontSize: 16)),
+              Text('${_ttsDelayMs.toInt()} ms', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          Slider(
+            value: _ttsDelayMs,
+            min: -5000,
+            max: 5000,
+            divisions: 20,
+            activeColor: AppColors.primary,
+            inactiveColor: Colors.white24,
+            onChanged: (val) {
+              setState(() => _ttsDelayMs = val);
+            },
+            onChangeEnd: (val) {
+              getIt<SharedPreferences>().setDouble('tts_delay_ms', val);
+            },
+          ),
+          const SizedBox(height: 4),
+          
+          // Voice-over Advanced Settings Button
+          _buildFocusableTile(
+            title: 'TTS Advanced Settings',
+            subtitle: 'Engine & API',
+            onTap: widget.onVoiceOverSettings,
           ),
           const SizedBox(height: 16),
           
@@ -146,7 +216,15 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(title, style: const TextStyle(color: Colors.white, fontSize: 18)),
-                      Text(subtitle, style: const TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          subtitle, 
+                          style: const TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.right,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),

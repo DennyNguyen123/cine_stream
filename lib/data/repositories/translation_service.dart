@@ -49,5 +49,9 @@ class TranslationService {
       return texts; // Fallback to original on error
     }
   }
-}
 
+  Future<String> translate(String text, {String targetLang = 'vi'}) async {
+    final result = await translateBatch([text], targetLang: targetLang);
+    return result.isNotEmpty ? result.first : text;
+  }
+}

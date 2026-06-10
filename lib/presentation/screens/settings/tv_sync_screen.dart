@@ -34,10 +34,22 @@ class _TvSyncScreenState extends State<TvSyncScreen> {
       final pass = data['pass'] as String? ?? '';
       final path = data['path'] as String? ?? '';
 
+      final ttsEngine = data['tts_engine'] as String? ?? 'native';
+      final ttsBaseUrl = data['tts_base_url'] as String? ?? '';
+      final ttsApiKey = data['tts_api_key'] as String? ?? '';
+      final ttsModel = data['tts_model'] as String? ?? 'tts-1';
+      final ttsVoice = data['tts_voice'] as String? ?? 'alloy';
+
       await prefs.setString('cinestream_webdav_url', url);
       await prefs.setString('cinestream_webdav_user', user);
       await prefs.setString('cinestream_webdav_pass', pass);
       await prefs.setString('cinestream_webdav_path', path);
+
+      await prefs.setString('tts_engine', ttsEngine);
+      await prefs.setString('tts_base_url', ttsBaseUrl);
+      await prefs.setString('tts_api_key', ttsApiKey);
+      await prefs.setString('tts_model', ttsModel);
+      await prefs.setString('tts_voice', ttsVoice);
 
       final webdav = getIt<WebDAVService>();
       webdav.init(url, user, pass, folderPath: path);

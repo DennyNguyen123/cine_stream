@@ -3,7 +3,9 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  audioplayers_windows
   flutter_inappwebview_windows
+  flutter_tts
   media_kit_libs_windows_video
   media_kit_video
   url_launcher_windows

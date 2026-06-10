@@ -5,7 +5,9 @@
 import FlutterMacOS
 import Foundation
 
+import audioplayers_darwin
 import flutter_inappwebview_macos
+import flutter_tts
 import media_kit_libs_macos_video
 import media_kit_video
 import mobile_scanner
@@ -18,7 +20,9 @@ import volume_controller
 import wakelock_plus
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
+  AudioplayersDarwinPlugin.register(with: registry.registrar(forPlugin: "AudioplayersDarwinPlugin"))
   InAppWebViewFlutterPlugin.register(with: registry.registrar(forPlugin: "InAppWebViewFlutterPlugin"))
+  FlutterTtsPlugin.register(with: registry.registrar(forPlugin: "FlutterTtsPlugin"))
   MediaKitLibsMacosVideoPlugin.register(with: registry.registrar(forPlugin: "MediaKitLibsMacosVideoPlugin"))
   MediaKitVideoPlugin.register(with: registry.registrar(forPlugin: "MediaKitVideoPlugin"))
   MobileScannerPlugin.register(with: registry.registrar(forPlugin: "MobileScannerPlugin"))

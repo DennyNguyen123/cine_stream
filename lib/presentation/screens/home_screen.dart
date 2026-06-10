@@ -460,13 +460,13 @@ class _SettingsButtonState extends State<_SettingsButton> {
               children: [
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                  child: Text('WEBDAV', style: TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  child: Text('SETTINGS', style: TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                 ),
                 ListTile(
                   autofocus: true,
                   focusColor: Colors.white24,
-                  leading: const Icon(Icons.cloud_sync, color: Colors.white),
-                  title: const Text('WebDAV Configuration', style: TextStyle(color: Colors.white)),
+                  leading: const Icon(Icons.settings_suggest, color: Colors.white),
+                  title: const Text('App Settings', style: TextStyle(color: Colors.white)),
                   onTap: () {
                     Navigator.pop(ctx);
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const WebdavSetupScreen()));
@@ -478,13 +478,13 @@ class _SettingsButtonState extends State<_SettingsButton> {
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                  child: Text('ABOUT', style: TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  child: Text('COMMUNITY', style: TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                 ),
                 ListTile(
                   focusColor: Colors.white24,
-                  leading: const Icon(Icons.code, color: Colors.white),
-                  title: const Text('Source Code (GitHub)', style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('github.com/DennyNguyen123/cine_stream', style: TextStyle(color: Colors.white70)),
+                  leading: const Icon(Icons.star_border, color: Colors.white),
+                  title: const Text('Star us on GitHub', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('View source code & contribute', style: TextStyle(color: Colors.white70)),
                   onTap: () {
                     launchUrl(Uri.parse('https://github.com/DennyNguyen123/cine_stream'), mode: LaunchMode.externalApplication);
                   },

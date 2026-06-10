@@ -1,6 +1,10 @@
 import 'package:get_it/get_it.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../domain/services/tts_service.dart';
+import '../data/services/tts/native_tts_impl.dart';
+import '../data/services/tts/openai_tts_impl.dart';
+import '../data/services/tts/tts_service_facade.dart';
 
 import '../data/repositories/history_repository.dart';
 import '../data/services/webdav_service.dart';
@@ -35,6 +39,23 @@ Future<void> setupInjection() async {
   // Repositories
   final prefs = await SharedPreferences.getInstance();
   getIt.registerLazySingleton<SharedPreferences>(() => prefs);
+
+  // Register TTS Services
+  final nativeTts = NativeTtsImpl();
+  getIt.registerSingleton<NativeTtsImpl>(nativeTts);
+  final openAiTts = OpenAiTtsImpl(
+    dio: getIt<Dio>(),
+    prefs: prefs,
+    nativeFallback: nativeTts,
+  );
+  getIt.registerLazySingleton<TtsService>(
+    () => TtsServiceFacade(
+      prefs: prefs,
+      nativeTts: nativeTts,
+      openAiTts: openAiTts,
+    ),
+  );
+
   getIt.registerLazySingleton<HistoryRepository>(() => HistoryRepositoryImpl(getIt(), getIt()));
   getIt.registerLazySingleton<SubtitleRepository>(() => SubtitleRepositoryImpl(getIt()));
   getIt.registerLazySingleton<ExternalSubtitleRepository>(() => ExternalSubtitleRepository(getIt()));

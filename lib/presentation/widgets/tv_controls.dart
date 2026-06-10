@@ -15,6 +15,9 @@ class TvControls extends StatefulWidget {
   final VoidCallback onEpisodes;
   final VoidCallback onServerToggle;
   final VoidCallback onBack;
+  final bool isVoiceOverEnabled;
+  final VoidCallback onVoiceOverToggle;
+  final VoidCallback onVolumeMixer;
   final VoidCallback? onPrevEpisode;
   final VoidCallback? onNextEpisode;
   final ValueChanged<int>? onSeek;
@@ -35,6 +38,9 @@ class TvControls extends StatefulWidget {
     required this.onEpisodes,
     required this.onServerToggle,
     required this.onBack,
+    required this.isVoiceOverEnabled,
+    required this.onVoiceOverToggle,
+    required this.onVolumeMixer,
     this.onPrevEpisode,
     this.onNextEpisode,
     this.onSeek,
@@ -100,6 +106,15 @@ class _TvControlsState extends State<TvControls> {
                     _buildIconButton(Icons.dns, widget.onServerToggle, downFocusNode: _playPauseNode),
                     const SizedBox(width: 16),
                     _buildIconButton(Icons.closed_caption, widget.onSubtitleToggle, downFocusNode: _playPauseNode),
+                    const SizedBox(width: 16),
+                    _buildIconButton(
+                      widget.isVoiceOverEnabled ? Icons.record_voice_over : Icons.voice_over_off,
+                      widget.onVoiceOverToggle,
+                      downFocusNode: _playPauseNode,
+                      color: widget.isVoiceOverEnabled ? Colors.blueAccent : null,
+                    ),
+                    const SizedBox(width: 16),
+                    _buildIconButton(Icons.tune, widget.onVolumeMixer, downFocusNode: _playPauseNode),
                     const SizedBox(width: 16),
                     _buildIconButton(Icons.settings, widget.onSettings, downFocusNode: _playPauseNode),
                   ],
@@ -171,7 +186,7 @@ class _TvControlsState extends State<TvControls> {
     );
   }
 
-  Widget _buildIconButton(IconData icon, VoidCallback onTap, {double size = 32, bool autoFocus = false, Key? key, FocusNode? focusNode, FocusNode? downFocusNode}) {
+  Widget _buildIconButton(IconData icon, VoidCallback onTap, {double size = 32, bool autoFocus = false, Key? key, FocusNode? focusNode, FocusNode? downFocusNode, Color? color}) {
     return _TvControlButton(
       key: key,
       icon: icon,
@@ -180,6 +195,7 @@ class _TvControlsState extends State<TvControls> {
       autoFocus: autoFocus,
       focusNode: focusNode,
       downFocusNode: downFocusNode,
+      color: color,
     );
   }
 }
@@ -191,6 +207,7 @@ class _TvControlButton extends StatefulWidget {
   final bool autoFocus;
   final FocusNode? focusNode;
   final FocusNode? downFocusNode;
+  final Color? color;
 
   const _TvControlButton({
     super.key,
@@ -200,6 +217,7 @@ class _TvControlButton extends StatefulWidget {
     this.autoFocus = false,
     this.focusNode,
     this.downFocusNode,
+    this.color,
   });
 
   @override
@@ -271,7 +289,7 @@ class _TvControlButtonState extends State<_TvControlButton> {
           ),
           child: Icon(
             widget.icon,
-            color: _isFocused ? Colors.white : Colors.white70,
+            color: _isFocused ? Colors.white : (widget.color ?? Colors.white70),
             size: widget.size,
           ),
         ),
