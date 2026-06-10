@@ -8,6 +8,7 @@ import '../../../domain/entities/filter.dart';
 import '../../../domain/entities/home_section.dart';
 import 'package:flutter/foundation.dart';
 import '../../../domain/repositories/movie_source.dart';
+import '../../../core/utils/stream_info_cache.dart';
 import 'kisskh_api.dart';
 
 class KissKhSource implements MovieSource {
@@ -158,6 +159,9 @@ class KissKhSource implements MovieSource {
   @override
   Future<StreamInfo?> getStreamInfo(String movieId, String episodeId, {String? serverId}) async {
     try {
+      final cached = StreamInfoCache.getStreamInfo(movieId, episodeId, serverId);
+      if (cached != null) return cached;
+
       int parsedMovieId = int.parse(movieId);
       int parsedEpisodeId = int.parse(episodeId);
 
@@ -193,10 +197,13 @@ class KissKhSource implements MovieSource {
         }
       }
 
-      return StreamInfo(
+      final streamInfo = StreamInfo(
         videoUrl: videoUrl,
         subtitles: tracks,
       );
+      
+      await StreamInfoCache.saveStreamInfo(movieId, episodeId, serverId, streamInfo);
+      return streamInfo;
     } catch (e) {
       debugPrint('KissKhSource getStreamInfo Error: $e');
       rethrow;

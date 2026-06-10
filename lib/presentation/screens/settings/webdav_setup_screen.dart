@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/webdav_service.dart';
@@ -20,12 +21,49 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
   final _userController = TextEditingController();
   final _passController = TextEditingController();
   final _pathController = TextEditingController();
+  
+  final _urlFocus = FocusNode();
+  final _userFocus = FocusNode();
+  final _passFocus = FocusNode();
+  final _pathFocus = FocusNode();
+  
   bool _isTesting = false;
 
   @override
   void initState() {
     super.initState();
     _loadConfig();
+    
+    _urlFocus.onKeyEvent = _handleKeyEvent;
+    _userFocus.onKeyEvent = _handleKeyEvent;
+    _passFocus.onKeyEvent = _handleKeyEvent;
+    _pathFocus.onKeyEvent = _handleKeyEvent;
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _userController.dispose();
+    _passController.dispose();
+    _pathController.dispose();
+    _urlFocus.dispose();
+    _userFocus.dispose();
+    _passFocus.dispose();
+    _pathFocus.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        node.nextFocus();
+        return KeyEventResult.handled;
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        node.previousFocus();
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
   }
 
   void _loadConfig() {
@@ -135,6 +173,8 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             const SizedBox(height: 24),
             TextField(
               controller: _urlController,
+              focusNode: _urlFocus,
+              textInputAction: TextInputAction.next,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
                 labelText: 'WebDAV URL',
@@ -147,6 +187,8 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _userController,
+              focusNode: _userFocus,
+              textInputAction: TextInputAction.next,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
                 labelText: 'Username',
@@ -158,6 +200,8 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _passController,
+              focusNode: _passFocus,
+              textInputAction: TextInputAction.next,
               obscureText: true,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
@@ -170,6 +214,8 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _pathController,
+              focusNode: _pathFocus,
+              textInputAction: TextInputAction.done,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
                 labelText: 'Remote Sync Folder',

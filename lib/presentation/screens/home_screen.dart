@@ -70,8 +70,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   return FocusTraversalGroup(
                     policy: OrderedTraversalPolicy(),
-                    child: SingleChildScrollView(
-                      child: Column(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 24.0, bottom: 24.0),
+                      child: SingleChildScrollView(
+                        clipBehavior: Clip.none,
+                        child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Row 0: Top bar
@@ -144,6 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
+                    ),
                   );
                 }
                 return const SizedBox.shrink();
@@ -171,7 +175,7 @@ class _TopBarState extends State<_TopBar> {
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Padding(
-      padding: EdgeInsets.only(top: 24.0, right: isMobile ? 16.0 : 48.0, left: isMobile ? 16.0 : 48.0),
+      padding: EdgeInsets.only(top: 0.0, right: isMobile ? 16.0 : 48.0, left: isMobile ? 16.0 : 48.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -562,13 +566,15 @@ class _HistoryRowState extends State<_FocusableHistoryRow> {
           ),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: isMobile ? 140 : 180,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding:
-                EdgeInsets.symmetric(horizontal: isMobile ? 8.0 : 50.0, vertical: 10.0),
-            itemCount: items.length,
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 8.0 : 50.0),
+          child: SizedBox(
+            height: isMobile ? 140 : 180,
+            child: ListView.builder(
+              clipBehavior: Clip.none,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(vertical: 10.0),
+              itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
               return Padding(
@@ -585,6 +591,7 @@ class _HistoryRowState extends State<_FocusableHistoryRow> {
             },
           ),
         ),
+      ),
       ],
     );
   }

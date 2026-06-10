@@ -23,6 +23,8 @@ import '../widgets/player_settings_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/repositories/source_manager.dart';
 import '../../data/services/log_service.dart';
+import '../../core/utils/stream_info_cache.dart';
+import '../widgets/debug_overlay.dart';
 
 class PlayerScreen extends StatefulWidget {
   final StreamInfo streamInfo;
@@ -71,6 +73,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _isPopping = false;
   Duration _targetSeekPosition = Duration.zero;
   Timer? _seekDebounceTimer;
+  Timer? _saveHistoryTimer;
   Timer? _hideControlsTimer;
   
   int _seekAccumulator = 0;
@@ -94,9 +97,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   int _backPressCount = 0;
   Timer? _backPressTimer;
 
-  bool _autoNext = true;
-  double _playbackSpeed = 1.0;
   bool _isChangingEpisode = false;
+  double _playbackSpeed = 1.0;
+  bool _autoNext = true;
+  bool _showDebugStats = false;
   bool _errorDialogShowing = false;
 
   @override
@@ -111,25 +115,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       getIt<LogService>().log('[PlayerScreen] Initializing with videoUrl: ${widget.streamInfo.videoUrl}');
       getIt<LogService>().log('[PlayerScreen] Initializing with headers: ${widget.streamInfo.headers}');
       
-      // DIAGNOSTIC TEST: Let's see if Dart http gets 404 or 200
-      () async {
-        try {
-          final uri = Uri.parse(widget.streamInfo.videoUrl);
-          final request = await HttpClient().getUrl(uri);
-          if (widget.streamInfo.headers != null) {
-            widget.streamInfo.headers!.forEach((key, value) {
-              request.headers.set(key, value);
-            });
-          }
-          final response = await request.close();
-          final bodyBytes = await response.map((chunk) => chunk).toList();
-          final bodyString = String.fromCharCodes(bodyBytes.expand((x) => x).take(500));
-          getIt<LogService>().log('[PlayerScreen] DIAGNOSTIC HTTP TEST: ${response.statusCode}');
-          getIt<LogService>().log('[PlayerScreen] DIAGNOSTIC HTTP BODY: $bodyString');
-        } catch (e, stack) {
-          getIt<LogService>().error('[PlayerScreen] DIAGNOSTIC HTTP TEST FAILED', e, stack);
-        }
-      }();
+      // Diagnostic test removed to prevent memory leak and OOM crashes
 
       if (widget.streamInfo.videoUrl.startsWith('http')) {
         _controller = VideoPlayerController.networkUrl(
@@ -163,17 +149,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final prefs = getIt<SharedPreferences>();
     _autoNext = prefs.getBool('auto_next') ?? true;
     _playbackSpeed = prefs.getDouble('playback_speed') ?? 1.0;
+    _showDebugStats = prefs.getBool('pref_debug_stats') ?? false;
 
     _controller.addListener(_videoListener);
     _startControlsTimer();
     
     // Periodically save history every 10 seconds
-    Timer.periodic(const Duration(seconds: 10), (timer) {
+    _saveHistoryTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      _saveHistory();
+      if (_isPlaying && !_isChangingEpisode) {
+        _saveHistory();
+      }
     });
     
     _availableSubtitles = List.from(widget.streamInfo.subtitles);
@@ -399,6 +388,40 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  int _lastPrimaryIndex = 0;
+  int _lastSecondaryIndex = 0;
+
+  int _findActiveCueIndex(List<SubtitleCue> cues, int posMs, int lastIndex) {
+    if (cues.isEmpty) return -1;
+    
+    // Fast path: still in the same cue
+    if (lastIndex >= 0 && lastIndex < cues.length && 
+        posMs >= cues[lastIndex].startMs && 
+        posMs <= cues[lastIndex].endMs) {
+      return lastIndex;
+    }
+    
+    // Binary search for O(log N) performance
+    int low = 0;
+    int high = cues.length - 1;
+    while (low <= high) {
+      int mid = low + ((high - low) >> 1);
+      final cue = cues[mid];
+      
+      if (posMs >= cue.startMs && posMs <= cue.endMs) {
+        return mid;
+      } else if (posMs < cue.startMs) {
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+    
+    // If not found (e.g. during a silence gap), keep the previous valid index 
+    // so we can resume fast path later or return -1 to indicate no active subtitle
+    return -1;
+  }
+
   void _videoListener() {
     if (!mounted) return;
     
@@ -408,36 +431,46 @@ class _PlayerScreenState extends State<PlayerScreen> {
     SubtitleCue? activePrimary;
     SubtitleCue? activeSecondary;
     
-    // Quick search for current primary subtitle cue
-    for (var cue in _primaryCues) {
-      if (posMsTop >= cue.startMs && posMsTop <= cue.endMs) {
-        activePrimary = cue;
-        break;
+    // Fast search primary subtitle
+    if (_primaryCues.isNotEmpty) {
+      _lastPrimaryIndex = _findActiveCueIndex(_primaryCues, posMsTop, _lastPrimaryIndex);
+      if (_lastPrimaryIndex != -1) {
+        activePrimary = _primaryCues[_lastPrimaryIndex];
       }
     }
 
-    // Quick search for current secondary subtitle cue
-    for (var cue in _secondaryCues) {
-      if (posMsBottom >= cue.startMs && posMsBottom <= cue.endMs) {
-        activeSecondary = cue;
-        break;
+    // Fast search secondary subtitle
+    if (_secondaryCues.isNotEmpty) {
+      _lastSecondaryIndex = _findActiveCueIndex(_secondaryCues, posMsBottom, _lastSecondaryIndex);
+      if (_lastSecondaryIndex != -1) {
+        activeSecondary = _secondaryCues[_lastSecondaryIndex];
       }
     }
 
-    setState(() {
-      _position = _controller.value.position;
-      _duration = _controller.value.duration;
-      _isPlaying = _controller.value.isPlaying;
-      _isBuffering = _controller.value.isBuffering;
-      _currentPrimaryCue = activePrimary;
-      _currentSecondaryCue = activeSecondary;
-    });
+    bool stateChanged = _isPlaying != _controller.value.isPlaying ||
+        _isBuffering != _controller.value.isBuffering ||
+        _currentPrimaryCue != activePrimary ||
+        _currentSecondaryCue != activeSecondary;
+        
+    // Update position only if controls are visible and position changed by > 500ms
+    bool positionChangedSignificantly = _showControls && (_position.inMilliseconds - _controller.value.position.inMilliseconds).abs() > 500;
+
+    if (stateChanged || positionChangedSignificantly) {
+      setState(() {
+        _position = _controller.value.position;
+        _duration = _controller.value.duration;
+        _isPlaying = _controller.value.isPlaying;
+        _isBuffering = _controller.value.isBuffering;
+        _currentPrimaryCue = activePrimary;
+        _currentSecondaryCue = activeSecondary;
+      });
+    }
 
     if (_controller.value.hasError && !_errorDialogShowing) {
       _showErrorDialog("Video player error:\n${_controller.value.errorDescription}");
     }
 
-    if (_duration.inMilliseconds > 0 && _position >= _duration && _autoNext && !_isChangingEpisode) {
+    if (_duration.inMilliseconds > 0 && _controller.value.position >= _duration && _autoNext && !_isChangingEpisode) {
       _playNextEpisode();
     }
   }
@@ -606,9 +639,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ElevatedButton(
             autofocus: true,
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
               setState(() => _errorDialogShowing = false);
+              
+              // Clear cache before retrying
+              await StreamInfoCache.clearCache(
+                widget.movieId, 
+                widget.episodeId, 
+                widget.streamInfo.currentServerId ?? widget.serverId
+              );
+
               // Retry current episode on current server
               final ep = widget.allEpisodes.firstWhere((e) => e.id == widget.episodeId, orElse: () => widget.allEpisodes.first);
               _changeEpisode(ep);
@@ -640,7 +681,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
-  void _saveHistory() {
+  void _saveHistory({bool syncWebDav = false}) {
     if (!mounted || _duration.inMilliseconds == 0) return;
     
     final historyRepo = getIt<HistoryRepository>();
@@ -655,12 +696,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
       timestamp: DateTime.now().millisecondsSinceEpoch,
       sourceId: getIt<SourceManager>().activeSourceId,
       serverId: widget.streamInfo.currentServerId ?? widget.serverId,
-    ));
+    ), syncWebDav: syncWebDav);
   }
 
   @override
   void dispose() {
-    _saveHistory();
+    _saveHistory(syncWebDav: true);
+    _saveHistoryTimer?.cancel();
     _seekDebounceTimer?.cancel();
     _hideControlsTimer?.cancel();
     _backPressTimer?.cancel();
@@ -1085,6 +1127,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           PlayerSettingsDialog(
                             currentSpeed: _playbackSpeed,
                             autoNext: _autoNext,
+                            debugMode: _showDebugStats,
                             onSpeedChanged: (speed) {
                               setState(() => _playbackSpeed = speed);
                               _controller.setPlaybackSpeed(speed);
@@ -1093,6 +1136,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             onAutoNextChanged: (val) {
                               setState(() => _autoNext = val);
                               getIt<SharedPreferences>().setBool('auto_next', val);
+                            },
+                            onDebugModeChanged: (val) {
+                              setState(() => _showDebugStats = val);
+                              getIt<SharedPreferences>().setBool('pref_debug_stats', val);
                             },
                           ),
                         );
@@ -1117,6 +1164,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   ),
                 ),
               ),
+              // Debug Overlay
+              if (_showDebugStats)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: DebugOverlay(controller: _controller),
+                ),
             ],
           ),
         ),

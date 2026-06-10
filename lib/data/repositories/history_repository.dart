@@ -6,7 +6,7 @@ import '../services/webdav_service.dart';
 
 abstract class HistoryRepository {
   Future<List<HistoryItem>> getHistory();
-  Future<void> saveHistory(HistoryItem item);
+  Future<void> saveHistory(HistoryItem item, {bool syncWebDav = true});
   Future<void> removeHistory(String movieId, String sourceId);
   Future<void> clearHistory();
   Future<HistoryItem?> getHistoryForMovie(String movieId, String sourceId);
@@ -43,7 +43,7 @@ class HistoryRepositoryImpl implements HistoryRepository {
   }
 
   @override
-  Future<void> saveHistory(HistoryItem item) async {
+  Future<void> saveHistory(HistoryItem item, {bool syncWebDav = true}) async {
     final list = await _getRawHistory();
     
     // Remove if already exists for this movie and source
@@ -63,7 +63,7 @@ class HistoryRepositoryImpl implements HistoryRepository {
     await _prefs.setString(_historyKey, encoded);
     
     // Background sync
-    if (_webdav.isConfigured) {
+    if (syncWebDav && _webdav.isConfigured) {
       _syncToWebDavBackground();
     }
   }

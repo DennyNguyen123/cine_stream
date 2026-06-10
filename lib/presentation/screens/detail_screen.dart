@@ -492,12 +492,16 @@ class _DetailScreenState extends State<DetailScreen> {
                                                     : Colors.white,
                                               ),
                                               const SizedBox(width: 8),
-                                              Text(
-                                                _getContinueWatchingText(detail),
-                                                style: TextStyle(
-                                                  fontSize: isMobile ? 16 : 18,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
+                                              Flexible(
+                                                child: Text(
+                                                  _getContinueWatchingText(detail),
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    fontSize: isMobile ? 16 : 18,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -645,45 +649,60 @@ class _DetailScreenState extends State<DetailScreen> {
                                             thumbVisibility: true,
                                             child: Padding(
                                               padding: const EdgeInsets.only(bottom: 8.0),
-                                              child: ListView.builder(
+                                              child: SingleChildScrollView(
                                                 controller: _seasonsScrollController,
                                                 scrollDirection: Axis.horizontal,
-                                                itemCount: seasons.length,
-                                                itemBuilder: (context, index) {
-                                              final season = seasons[index];
-                                              final isSelected = season == _selectedSeason;
-                                              return Padding(
-                                                padding: const EdgeInsets.only(right: 12.0),
-                                                child: _buildFilterChip(
-                                                  text: 'Season $season',
-                                                  isSelected: isSelected,
-                                                  focusNode: index == 0 ? _firstSeasonNode : null,
-                                                  onKeyEvent: (node, event) {
-                                                    if (event is KeyDownEvent) {
-                                                      return _handleRowFocus(
-                                                        _firstSeasonNode,
-                                                        event,
-                                                        detail,
-                                                        () {
+                                                child: Row(
+                                                  children: List.generate(seasons.length, (index) {
+                                                    final season = seasons[index];
+                                                    final isSelected = season == _selectedSeason;
+                                                    
+                                                    // Initial scroll to selected
+                                                    if (isSelected && _firstSeasonNode.context == null) {
+                                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                        if (_firstSeasonNode.context != null && _seasonsScrollController.hasClients) {
+                                                          Scrollable.ensureVisible(
+                                                            _firstSeasonNode.context!,
+                                                            alignment: 0.5,
+                                                            duration: const Duration(milliseconds: 300),
+                                                          );
+                                                        }
+                                                      });
+                                                    }
+
+                                                    return Padding(
+                                                      padding: const EdgeInsets.only(right: 12.0),
+                                                      child: _buildFilterChip(
+                                                        text: 'Season $season',
+                                                        isSelected: isSelected,
+                                                        focusNode: isSelected ? _firstSeasonNode : null,
+                                                        onKeyEvent: (node, event) {
+                                                          if (event is KeyDownEvent) {
+                                                            return _handleRowFocus(
+                                                              _firstSeasonNode,
+                                                              event,
+                                                              detail,
+                                                              () {
+                                                                setState(() {
+                                                                  _selectedSeason = season;
+                                                                  _selectedPage = 0;
+                                                                });
+                                                              },
+                                                            );
+                                                          }
+                                                          return KeyEventResult.ignored;
+                                                        },
+                                                        onTap: () {
                                                           setState(() {
                                                             _selectedSeason = season;
                                                             _selectedPage = 0;
                                                           });
                                                         },
-                                                      );
-                                                    }
-                                                    return KeyEventResult.ignored;
-                                                  },
-                                                  onTap: () {
-                                                    setState(() {
-                                                      _selectedSeason = season;
-                                                      _selectedPage = 0;
-                                                    });
-                                                  },
+                                                      ),
+                                                    );
+                                                  }),
                                                 ),
-                                              );
-                                            },
-                                          ),
+                                              ),
                                         ),
                                         ),
                                         ),
@@ -699,49 +718,64 @@ class _DetailScreenState extends State<DetailScreen> {
                                             thumbVisibility: true,
                                             child: Padding(
                                               padding: const EdgeInsets.only(bottom: 8.0),
-                                              child: ListView.builder(
+                                              child: SingleChildScrollView(
                                                 controller: _pagesScrollController,
                                                 scrollDirection: Axis.horizontal,
-                                                itemCount: totalPages,
-                                                itemBuilder: (context, index) {
-                                              final startIdx = index * _episodesPerPage;
-                                              final endIdx = (index + 1) * _episodesPerPage;
-                                              final actualEndIdx = endIdx > seasonEpisodes.length ? seasonEpisodes.length : endIdx;
-                                              
-                                              final startEpNum = seasonEpisodes[startIdx].number.toInt();
-                                              final endEpNum = seasonEpisodes[actualEndIdx - 1].number.toInt();
-                                              
-                                              final isSelected = index == _selectedPage;
-                                              return Padding(
-                                                padding: const EdgeInsets.only(right: 12.0),
-                                                child: _buildFilterChip(
-                                                  text: 'Episodes $startEpNum - $endEpNum',
-                                                  isSelected: isSelected,
-                                                  focusNode: index == 0 ? _firstPageNode : null,
-                                                  onKeyEvent: (node, event) {
-                                                    if (event is KeyDownEvent) {
-                                                      return _handleRowFocus(
-                                                        _firstPageNode,
-                                                        event,
-                                                        detail,
-                                                        () {
+                                                child: Row(
+                                                  children: List.generate(totalPages, (index) {
+                                                    final startIdx = index * _episodesPerPage;
+                                                    final endIdx = (index + 1) * _episodesPerPage;
+                                                    final actualEndIdx = endIdx > seasonEpisodes.length ? seasonEpisodes.length : endIdx;
+                                                    
+                                                    final startEpNum = seasonEpisodes[startIdx].number.toInt();
+                                                    final endEpNum = seasonEpisodes[actualEndIdx - 1].number.toInt();
+                                                    
+                                                    final isSelected = index == _selectedPage;
+
+                                                    // Initial scroll to selected
+                                                    if (isSelected && _firstPageNode.context == null) {
+                                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                        if (_firstPageNode.context != null && _pagesScrollController.hasClients) {
+                                                          Scrollable.ensureVisible(
+                                                            _firstPageNode.context!,
+                                                            alignment: 0.5,
+                                                            duration: const Duration(milliseconds: 300),
+                                                          );
+                                                        }
+                                                      });
+                                                    }
+
+                                                    return Padding(
+                                                      padding: const EdgeInsets.only(right: 12.0),
+                                                      child: _buildFilterChip(
+                                                        text: 'Episodes $startEpNum - $endEpNum',
+                                                        isSelected: isSelected,
+                                                        focusNode: isSelected ? _firstPageNode : null,
+                                                        onKeyEvent: (node, event) {
+                                                          if (event is KeyDownEvent) {
+                                                            return _handleRowFocus(
+                                                              _firstPageNode,
+                                                              event,
+                                                              detail,
+                                                              () {
+                                                                setState(() {
+                                                                  _selectedPage = index;
+                                                                });
+                                                              },
+                                                            );
+                                                          }
+                                                          return KeyEventResult.ignored;
+                                                        },
+                                                        onTap: () {
                                                           setState(() {
                                                             _selectedPage = index;
                                                           });
                                                         },
-                                                      );
-                                                    }
-                                                    return KeyEventResult.ignored;
-                                                  },
-                                                  onTap: () {
-                                                    setState(() {
-                                                      _selectedPage = index;
-                                                    });
-                                                  },
+                                                      ),
+                                                    );
+                                                  }),
                                                 ),
-                                              );
-                                            },
-                                          ),
+                                              ),
                                         ),
                                         ),
                                         ),
@@ -756,19 +790,40 @@ class _DetailScreenState extends State<DetailScreen> {
                                           thumbVisibility: true,
                                           child: Padding(
                                             padding: const EdgeInsets.only(bottom: 16.0),
-                                            child: ListView.builder(
+                                            child: SingleChildScrollView(
                                               controller: _episodesScrollController,
                                               scrollDirection: Axis.horizontal,
-                                              itemCount: pageEpisodes.length,
-                                              itemBuilder: (context, index) {
-                                            final ep = pageEpisodes[index];
-                                            return _buildEpisodeItem(
-                                              ep,
-                                              detail,
-                                              isFirst: index == 0,
-                                            );
-                                          },
-                                        ),
+                                              child: Row(
+                                                children: List.generate(pageEpisodes.length, (index) {
+                                                  final ep = pageEpisodes[index];
+                                                  bool isTarget = false;
+                                                  if (_historyItem != null && pageEpisodes.any((e) => e.id == _historyItem!.episodeId)) {
+                                                    isTarget = ep.id == _historyItem!.episodeId;
+                                                  } else {
+                                                    isTarget = index == 0;
+                                                  }
+                                                  
+                                                  // Initial scroll to target when first built
+                                                  if (isTarget && _firstEpisodeNode.context == null) {
+                                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                      if (_firstEpisodeNode.context != null && _episodesScrollController.hasClients) {
+                                                        Scrollable.ensureVisible(
+                                                          _firstEpisodeNode.context!,
+                                                          alignment: 0.5,
+                                                          duration: const Duration(milliseconds: 300),
+                                                        );
+                                                      }
+                                                    });
+                                                  }
+
+                                                  return _buildEpisodeItem(
+                                                    ep,
+                                                    detail,
+                                                    isFirst: isTarget,
+                                                  );
+                                                }),
+                                              ),
+                                            ),
                                       ),
                                       ),
                                       ),

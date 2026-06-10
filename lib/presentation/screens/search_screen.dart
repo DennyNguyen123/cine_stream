@@ -102,6 +102,20 @@ class _SearchScreenState extends State<SearchScreen> {
                 currentFilters = state.currentFilters;
               }
 
+              final screenWidth = MediaQuery.of(context).size.width;
+              int crossAxisCount = 5;
+              if (screenWidth < 500) {
+                crossAxisCount = 3;
+              } else if (screenWidth < 800) {
+                crossAxisCount = 4;
+              } else if (screenWidth < 1200) {
+                crossAxisCount = 5;
+              } else if (screenWidth < 1600) {
+                crossAxisCount = 6;
+              } else {
+                crossAxisCount = 8;
+              }
+
               return CustomScrollView(
                 slivers: [
                   // Search Bar
@@ -378,8 +392,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     SliverPadding(
                       padding: const EdgeInsets.all(24.0),
                       sliver: SliverGrid(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 5,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
                           childAspectRatio: 0.65,
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,

@@ -52,15 +52,17 @@ class MovieRowState extends State<MovieRow> {
               ),
             ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: isMobile ? 180 : 240,
-            child: ListView.builder(
-              controller: widget.scrollController,
-              clipBehavior: Clip.none,
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8.0 : 50.0, vertical: 10.0),
-              itemCount: widget.movies.length,
-              itemBuilder: (context, index) {
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 8.0 : 50.0),
+            child: SizedBox(
+              height: isMobile ? 180 : 240,
+              child: ListView.builder(
+                controller: widget.scrollController,
+                clipBehavior: Clip.none,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(vertical: 10.0),
+                itemCount: widget.movies.length,
+                itemBuilder: (context, index) {
                 final movie = widget.movies[index];
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -78,6 +80,7 @@ class MovieRowState extends State<MovieRow> {
                   ),
                 );
               },
+            ),
             ),
           ),
         ],

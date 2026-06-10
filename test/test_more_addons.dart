@@ -3,12 +3,12 @@ import 'dart:convert';
 
 void main() async {
   final dio = Dio();
-  
+
   final sources = [
-    'https://msubtitles.strem.io/subtitles/series/tt13875494:2:18.json',
-    'https://legion.strem.io/subtitles/series/tt13875494:2:18.json',
-    'https://subscene.strem.io/subtitles/series/tt13875494:2:18.json',
-    'https://opensubtitles.com/subtitles/series/tt13875494:2:18.json', // Not a stremio addon probably
+    'https://msubtitles.strem.io/subtitles/series/tt0816696:3:10.json',
+    'https://legion.strem.io/subtitles/series/tt0816696:3:10.json',
+    'https://subscene.strem.io/subtitles/series/tt0816696:3:10.json',
+    'https://opensubtitles.com/subtitles/series/tt0816696:3:10.json', // Not a stremio addon probably
   ];
 
   for (final url in sources) {
@@ -21,7 +21,7 @@ void main() async {
           receiveTimeout: const Duration(seconds: 5),
         ),
       );
-      
+
       print('Status: ${response.statusCode}');
       dynamic data = response.data;
       if (data is String) {
@@ -31,12 +31,12 @@ void main() async {
           try {
             data = jsonDecode(data);
             print('Parsed JSON.');
-          } catch(e) {
+          } catch (e) {
             print('Not JSON.');
           }
         }
       }
-      
+
       if (data is Map && data['subtitles'] != null) {
         final subs = data['subtitles'] as List;
         print('SUCCESS: Found ${subs.length} subtitles');

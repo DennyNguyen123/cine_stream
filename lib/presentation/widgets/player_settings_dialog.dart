@@ -5,15 +5,19 @@ import '../../../core/theme/app_colors.dart';
 class PlayerSettingsDialog extends StatefulWidget {
   final double currentSpeed;
   final bool autoNext;
+  final bool debugMode;
   final ValueChanged<double> onSpeedChanged;
   final ValueChanged<bool> onAutoNextChanged;
+  final ValueChanged<bool> onDebugModeChanged;
 
   const PlayerSettingsDialog({
     super.key,
     required this.currentSpeed,
     required this.autoNext,
+    required this.debugMode,
     required this.onSpeedChanged,
     required this.onAutoNextChanged,
+    required this.onDebugModeChanged,
   });
 
   @override
@@ -23,6 +27,7 @@ class PlayerSettingsDialog extends StatefulWidget {
 class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
   late double _speed;
   late bool _autoNext;
+  late bool _debugMode;
 
   final List<double> _speeds = [0.5, 1.0, 1.25, 1.5, 2.0];
 
@@ -31,6 +36,7 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
     super.initState();
     _speed = widget.currentSpeed;
     _autoNext = widget.autoNext;
+    _debugMode = widget.debugMode;
   }
 
   @override
@@ -66,6 +72,19 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                 _autoNext = !_autoNext;
               });
               widget.onAutoNextChanged(_autoNext);
+            },
+          ),
+          const SizedBox(height: 16),
+          
+          // Debug Stats Toggle
+          _buildFocusableTile(
+            title: 'Debug Stats',
+            subtitle: _debugMode ? 'On' : 'Off',
+            onTap: () {
+              setState(() {
+                _debugMode = !_debugMode;
+              });
+              widget.onDebugModeChanged(_debugMode);
             },
           ),
           const SizedBox(height: 16),

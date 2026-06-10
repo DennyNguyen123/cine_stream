@@ -11,6 +11,7 @@ import 'extractors/vidplay_extractor.dart';
 import 'extractors/vdrk_subtitle_extractor.dart';
 import 'extractors/vidsrcme_extractor.dart';
 import '../../../domain/entities/subtitle.dart';
+import '../../../core/utils/stream_info_cache.dart';
 
 class CinemetaSource implements MovieSource {
   final Dio _dio;
@@ -215,6 +216,9 @@ class CinemetaSource implements MovieSource {
   @override
   Future<StreamInfo?> getStreamInfo(String movieId, String episodeId, {String? serverId}) async {
     try {
+      final cached = StreamInfoCache.getStreamInfo(movieId, episodeId, serverId);
+      if (cached != null) return cached;
+
       final parts = movieId.split('/');
       final type = parts[0];
       final imdbId = parts[1];
@@ -331,13 +335,15 @@ class CinemetaSource implements MovieSource {
       }
 
       if (streamInfo != null) {
-        return StreamInfo(
+        final result = StreamInfo(
           videoUrl: streamInfo.videoUrl,
           subtitles: streamInfo.subtitles,
           servers: servers,
           currentServerId: resolvedServerId,
           headers: streamInfo.headers,
         );
+        await StreamInfoCache.saveStreamInfo(movieId, episodeId, serverId, result);
+        return result;
       }
 
       return null;
