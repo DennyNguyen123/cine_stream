@@ -32,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _pollingTimer;
   final List<GlobalKey<MovieRowState>> _rowKeys = [];
   GlobalKey<_HistoryRowState>? _historyRowKey;
+  final GlobalKey<_TopBarState> _topBarKey = GlobalKey<_TopBarState>();
 
   @override
   void dispose() {
@@ -59,8 +60,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   return const Center(child: CircularProgressIndicator());
                 } else if (state is HomeError) {
                   return Center(
-                      child: Text(state.message,
-                          style: const TextStyle(color: Colors.white)));
+                    child: Text(
+                      state.message,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  );
                 } else if (state is HomeLoaded) {
                   _rowKeys.clear();
                   _historyRowKey = GlobalKey<_HistoryRowState>();
@@ -75,78 +79,93 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: SingleChildScrollView(
                         clipBehavior: Clip.none,
                         child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Row 0: Top bar
-                          FocusTraversalOrder(
-                            order: NumericFocusOrder(0),
-                            child: _TopBar(key: UniqueKey()),
-                          ),
-                          // Row 1: History
-                          FocusTraversalOrder(
-                            order: NumericFocusOrder(1),
-                            child: _FocusableHistoryRow(
-                              key: _historyRowKey,
-                              pollingTimer: _pollingTimer,
-                              onMoviePressed: (item) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => DetailScreen(
-                                      movie: Movie(
-                                        id: item.movieId,
-                                        title: item.movieTitle,
-                                        thumbnail: item.thumbnail,
-                                      ),
-                                      autoPlay: true,
-                                    ),
-                                  ),
-                                ).then((_) {
-                                  if (context.mounted) {
-                                    context
-                                        .read<HistoryCubit>()
-                                        .loadHistory();
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Row 0: Top bar
+                            FocusTraversalOrder(
+                              order: NumericFocusOrder(0),
+                              child: _TopBar(
+                                key: _topBarKey,
+                                onWrapUp: () {
+                                  if (_rowKeys.isNotEmpty) {
+                                    _rowKeys.last.currentState?.requestFocus();
+                                  } else if (_historyRowKey?.currentState !=
+                                      null) {
+                                    // fallback to history row if no movie rows
                                   }
-                                });
-                              },
-                              onDeleteItem: (item) {
-                                context
-                                    .read<HistoryCubit>()
-                                    .removeHistory(
-                                        item.movieId, item.sourceId);
-                              },
-                            ),
-                          ),
-                          // Row 2+: Content sections
-                          ...List.generate(state.sections.length, (i) {
-                            final section = state.sections[i];
-                            return FocusTraversalOrder(
-                              order: NumericFocusOrder((i + 2).toDouble()),
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.only(bottom: 24.0),
-                                child: MovieRow(
-                                  key: _rowKeys[i],
-                                  rowIndex: i + 2,
-                                  title: section.title,
-                                  movies: section.movies,
-                                  onMoviePressed: (movie) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => DetailScreen(
-                                            movie: movie, autoPlay: false),
-                                      ),
-                                    );
-                                  },
-                                ),
+                                },
                               ),
-                            );
-                          }),
-                          const SizedBox(height: 48),
-                        ],
+                            ),
+                            // Row 1: History
+                            FocusTraversalOrder(
+                              order: NumericFocusOrder(1),
+                              child: _FocusableHistoryRow(
+                                key: _historyRowKey,
+                                pollingTimer: _pollingTimer,
+                                onMoviePressed: (item) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => DetailScreen(
+                                        movie: Movie(
+                                          id: item.movieId,
+                                          title: item.movieTitle,
+                                          thumbnail: item.thumbnail,
+                                        ),
+                                        autoPlay: true,
+                                      ),
+                                    ),
+                                  ).then((_) {
+                                    if (context.mounted) {
+                                      context
+                                          .read<HistoryCubit>()
+                                          .loadHistory();
+                                    }
+                                  });
+                                },
+                                onDeleteItem: (item) {
+                                  context.read<HistoryCubit>().removeHistory(
+                                    item.movieId,
+                                    item.sourceId,
+                                  );
+                                },
+                              ),
+                            ),
+                            // Row 2+: Content sections
+                            ...List.generate(state.sections.length, (i) {
+                              final section = state.sections[i];
+                              return FocusTraversalOrder(
+                                order: NumericFocusOrder((i + 2).toDouble()),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 24.0),
+                                  child: MovieRow(
+                                    key: _rowKeys[i],
+                                    rowIndex: i + 2,
+                                    title: section.title,
+                                    movies: section.movies,
+                                    isLastRow: i == state.sections.length - 1,
+                                    onWrapDown: () {
+                                      _topBarKey.currentState?.requestFocus();
+                                    },
+                                    onMoviePressed: (movie) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => DetailScreen(
+                                            movie: movie,
+                                            autoPlay: false,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            }),
+                            const SizedBox(height: 48),
+                          ],
+                        ),
                       ),
-                    ),
                     ),
                   );
                 }
@@ -164,38 +183,69 @@ class _HomeScreenState extends State<HomeScreen> {
 // Top Bar widget (source selector + search button)
 // ====================================================================
 class _TopBar extends StatefulWidget {
-  const _TopBar({super.key});
+  final VoidCallback? onWrapUp;
+  const _TopBar({super.key, this.onWrapUp});
 
   @override
   State<_TopBar> createState() => _TopBarState();
 }
 
 class _TopBarState extends State<_TopBar> {
+  final FocusNode _firstButtonNode = FocusNode();
+
+  void requestFocus() {
+    _firstButtonNode.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _firstButtonNode.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-    return Padding(
-      padding: EdgeInsets.only(top: 0.0, right: isMobile ? 16.0 : 48.0, left: isMobile ? 16.0 : 48.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Flexible(child: _SourceButton()),
-          const SizedBox(width: 8),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _SettingsButton(),
-              const SizedBox(width: 16),
-              _SearchButton(),
-            ],
-          ),
-        ],
+    return Focus(
+      canRequestFocus: false,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.arrowUp) {
+          widget.onWrapUp?.call();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: 0.0,
+          right: isMobile ? 16.0 : 48.0,
+          left: isMobile ? 16.0 : 48.0,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(child: _SourceButton(focusNode: _firstButtonNode)),
+            const SizedBox(width: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _SettingsButton(),
+                const SizedBox(width: 16),
+                _SearchButton(),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _SourceButton extends StatefulWidget {
+  final FocusNode? focusNode;
+  const _SourceButton({this.focusNode});
+
   @override
   State<_SourceButton> createState() => _SourceButtonState();
 }
@@ -207,6 +257,7 @@ class _SourceButtonState extends State<_SourceButton> {
   Widget build(BuildContext context) {
     final sourceManager = getIt<SourceManager>();
     return Focus(
+      focusNode: widget.focusNode,
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
@@ -222,11 +273,16 @@ class _SourceButtonState extends State<_SourceButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           transform: Matrix4.diagonal3Values(
-              _isFocused ? 1.05 : 1.0, _isFocused ? 1.05 : 1.0, 1.0),
+            _isFocused ? 1.05 : 1.0,
+            _isFocused ? 1.05 : 1.0,
+            1.0,
+          ),
           transformAlignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: _isFocused ? AppColors.primary : Colors.black.withValues(alpha: 0.6),
+            color: _isFocused
+                ? AppColors.primary
+                : Colors.black.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: _isFocused ? Colors.white : Colors.white24,
@@ -238,7 +294,7 @@ class _SourceButtonState extends State<_SourceButton> {
                       color: AppColors.primary.withValues(alpha: 0.6),
                       blurRadius: 15,
                       spreadRadius: 2,
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -251,7 +307,9 @@ class _SourceButtonState extends State<_SourceButton> {
                 child: Text(
                   sourceManager.activeSource.sourceName,
                   style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -265,6 +323,8 @@ class _SourceButtonState extends State<_SourceButton> {
   void _showSourceSelectionDialog(BuildContext context) {
     final sourceManager = getIt<SourceManager>();
     final sources = sourceManager.getAvailableSources();
+    final FocusNode firstNode = FocusNode();
+    final FocusNode lastNode = FocusNode();
 
     showModalBottomSheet(
       context: context,
@@ -281,8 +341,18 @@ class _SourceButtonState extends State<_SourceButton> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                  child: Text('Select Source', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 8.0,
+                  ),
+                  child: Text(
+                    'Select Source',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 ListView.builder(
                   shrinkWrap: true,
@@ -290,31 +360,79 @@ class _SourceButtonState extends State<_SourceButton> {
                   itemCount: sources.length,
                   itemBuilder: (dialogCtx, index) {
                     final source = sources[index];
-                    final isSelected = sourceManager.activeSourceId == source['id'];
-                    return ListTile(
-                      autofocus: isSelected,
-                      focusColor: Colors.white24,
-                      title: Text(source['name'] ?? '',
-                          style: TextStyle(
-                            color: isSelected ? AppColors.primary : Colors.white,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          )),
-                      trailing: isSelected
-                          ? const Icon(Icons.check, color: AppColors.primary)
-                          : null,
-                      tileColor: isSelected ? Colors.white12 : Colors.transparent,
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        if (!isSelected) {
-                          await sourceManager.setActiveSource(source['id']!);
-                          PaintingBinding.instance.imageCache.clear();
-                          PaintingBinding.instance.imageCache.clearLiveImages();
-                          
-                          if (!context.mounted) return;
-                          context.read<HomeCubit>().loadData();
-                          context.read<HistoryCubit>().loadHistory();
-                        }
-                      },
+                    final isSelected =
+                        sourceManager.activeSourceId == source['id'];
+                    final isFirst = index == 0;
+                    final isLast = index == sources.length - 1;
+                    return Builder(
+                      builder: (context) {
+                        bool isFocused = false;
+                        return StatefulBuilder(
+                          builder: (context, setTileState) {
+                            return Focus(
+                              focusNode: isFirst ? firstNode : (isLast ? lastNode : null),
+                              autofocus: isSelected,
+                              onFocusChange: (focused) => setTileState(() => isFocused = focused),
+                              onKeyEvent: (node, event) {
+                                if (event is KeyDownEvent) {
+                                  if (isFirst && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                    lastNode.requestFocus();
+                                    return KeyEventResult.handled;
+                                  }
+                                  if (isLast && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                    firstNode.requestFocus();
+                                    return KeyEventResult.handled;
+                                  }
+                                  if (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter) {
+                                    Navigator.pop(ctx);
+                                    if (!isSelected) {
+                                      sourceManager.setActiveSource(source['id']!).then((_) {
+                                        PaintingBinding.instance.imageCache.clear();
+                                        PaintingBinding.instance.imageCache.clearLiveImages();
+                                        if (!context.mounted) return;
+                                        context.read<HomeCubit>().loadData();
+                                        context.read<HistoryCubit>().loadHistory();
+                                      });
+                                    }
+                                    return KeyEventResult.handled;
+                                  }
+                                }
+                                return KeyEventResult.ignored;
+                              },
+                              child: GestureDetector(
+                                onTap: () async {
+                                  Navigator.pop(ctx);
+                                  if (!isSelected) {
+                                    await sourceManager.setActiveSource(source['id']!);
+                                    PaintingBinding.instance.imageCache.clear();
+                                    PaintingBinding.instance.imageCache.clearLiveImages();
+                                    if (!context.mounted) return;
+                                    context.read<HomeCubit>().loadData();
+                                    context.read<HistoryCubit>().loadHistory();
+                                  }
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isFocused ? AppColors.primary.withValues(alpha: 0.4) : (isSelected ? Colors.white12 : Colors.transparent),
+                                    border: Border.all(color: isFocused ? AppColors.primary : Colors.transparent, width: 2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: ListTile(
+                                    title: Text(
+                                      source['name'] ?? '',
+                                      style: TextStyle(
+                                        color: isSelected ? AppColors.primary : Colors.white,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                    trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        );
+                      }
                     );
                   },
                 ),
@@ -361,11 +479,16 @@ class _SearchButtonState extends State<_SearchButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           transform: Matrix4.diagonal3Values(
-              _isFocused ? 1.1 : 1.0, _isFocused ? 1.1 : 1.0, 1.0),
+            _isFocused ? 1.1 : 1.0,
+            _isFocused ? 1.1 : 1.0,
+            1.0,
+          ),
           transformAlignment: Alignment.center,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _isFocused ? AppColors.primary : Colors.black.withValues(alpha: 0.6),
+            color: _isFocused
+                ? AppColors.primary
+                : Colors.black.withValues(alpha: 0.6),
             shape: BoxShape.circle,
             border: Border.all(
               color: _isFocused ? Colors.white : Colors.white24,
@@ -377,7 +500,7 @@ class _SearchButtonState extends State<_SearchButton> {
                       color: AppColors.primary.withValues(alpha: 0.6),
                       blurRadius: 15,
                       spreadRadius: 2,
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -416,11 +539,16 @@ class _SettingsButtonState extends State<_SettingsButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           transform: Matrix4.diagonal3Values(
-              _isFocused ? 1.1 : 1.0, _isFocused ? 1.1 : 1.0, 1.0),
+            _isFocused ? 1.1 : 1.0,
+            _isFocused ? 1.1 : 1.0,
+            1.0,
+          ),
           transformAlignment: Alignment.center,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _isFocused ? AppColors.primary : Colors.black.withValues(alpha: 0.6),
+            color: _isFocused
+                ? AppColors.primary
+                : Colors.black.withValues(alpha: 0.6),
             shape: BoxShape.circle,
             border: Border.all(
               color: _isFocused ? Colors.white : Colors.white24,
@@ -432,7 +560,7 @@ class _SettingsButtonState extends State<_SettingsButton> {
                       color: AppColors.primary.withValues(alpha: 0.6),
                       blurRadius: 15,
                       spreadRadius: 2,
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -443,6 +571,8 @@ class _SettingsButtonState extends State<_SettingsButton> {
   }
 
   void _showSettingsDialog(BuildContext context) {
+    final FocusNode firstNode = FocusNode();
+    final FocusNode lastNode = FocusNode();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -459,35 +589,122 @@ class _SettingsButtonState extends State<_SettingsButton> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                  child: Text('SETTINGS', style: TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 8.0,
+                  ),
+                  child: Text(
+                    'SETTINGS',
+                    style: TextStyle(
+                      color: Colors.blueAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                 ),
-                ListTile(
-                  autofocus: true,
-                  focusColor: Colors.white24,
-                  leading: const Icon(Icons.settings_suggest, color: Colors.white),
-                  title: const Text('App Settings', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const WebdavSetupScreen()));
-                  },
+                Builder(
+                  builder: (context) {
+                    bool isFocused = false;
+                    return StatefulBuilder(
+                      builder: (context, setTileState) {
+                        return Focus(
+                          focusNode: firstNode,
+                          autofocus: true,
+                          onFocusChange: (focused) => setTileState(() => isFocused = focused),
+                          onKeyEvent: (node, event) {
+                            if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                              lastNode.requestFocus();
+                              return KeyEventResult.handled;
+                            }
+                            if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                              Navigator.pop(ctx);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const WebdavSetupScreen()));
+                              return KeyEventResult.handled;
+                            }
+                            return KeyEventResult.ignored;
+                          },
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const WebdavSetupScreen()));
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isFocused ? AppColors.primary.withValues(alpha: 0.4) : Colors.transparent,
+                                border: Border.all(color: isFocused ? AppColors.primary : Colors.transparent, width: 2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const ListTile(
+                                leading: Icon(Icons.settings_suggest, color: Colors.white),
+                                title: Text('App Settings', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    );
+                  }
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8.0),
                   child: Divider(color: Colors.white24, thickness: 1),
                 ),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-                  child: Text('COMMUNITY', style: TextStyle(color: Colors.blueAccent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 8.0,
+                  ),
+                  child: Text(
+                    'COMMUNITY',
+                    style: TextStyle(
+                      color: Colors.blueAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                 ),
-                ListTile(
-                  focusColor: Colors.white24,
-                  leading: const Icon(Icons.star_border, color: Colors.white),
-                  title: const Text('Star us on GitHub', style: TextStyle(color: Colors.white)),
-                  subtitle: const Text('View source code & contribute', style: TextStyle(color: Colors.white70)),
-                  onTap: () {
-                    launchUrl(Uri.parse('https://github.com/DennyNguyen123/cine_stream'), mode: LaunchMode.externalApplication);
-                  },
+                Builder(
+                  builder: (context) {
+                    bool isFocused = false;
+                    return StatefulBuilder(
+                      builder: (context, setTileState) {
+                        return Focus(
+                          focusNode: lastNode,
+                          onFocusChange: (focused) => setTileState(() => isFocused = focused),
+                          onKeyEvent: (node, event) {
+                            if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                              firstNode.requestFocus();
+                              return KeyEventResult.handled;
+                            }
+                            if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                              launchUrl(Uri.parse('https://github.com/DennyNguyen123/cine_stream'), mode: LaunchMode.externalApplication);
+                              return KeyEventResult.handled;
+                            }
+                            return KeyEventResult.ignored;
+                          },
+                          child: GestureDetector(
+                            onTap: () {
+                              launchUrl(Uri.parse('https://github.com/DennyNguyen123/cine_stream'), mode: LaunchMode.externalApplication);
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isFocused ? AppColors.primary.withValues(alpha: 0.4) : Colors.transparent,
+                                border: Border.all(color: isFocused ? AppColors.primary : Colors.transparent, width: 2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const ListTile(
+                                leading: Icon(Icons.star_border, color: Colors.white),
+                                title: Text('Star us on GitHub', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                subtitle: Text('View source code & contribute', style: TextStyle(color: Colors.white70)),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    );
+                  }
                 ),
               ],
             ),
@@ -575,23 +792,23 @@ class _HistoryRowState extends State<_FocusableHistoryRow> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(vertical: 10.0),
               itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: _HistoryCard(
-                  key: ValueKey('history_${item.movieId}'),
-                  item: item,
-                  autoFocus: index == 0,
-                  onFocus: () {},
-                  onPlayPressed: () => widget.onMoviePressed(item),
-                  onDeletePressed: () => widget.onDeleteItem(item),
-                ),
-              );
-            },
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: _HistoryCard(
+                    key: ValueKey('history_${item.movieId}'),
+                    item: item,
+                    autoFocus: index == 0,
+                    onFocus: () {},
+                    onPlayPressed: () => widget.onMoviePressed(item),
+                    onDeletePressed: () => widget.onDeleteItem(item),
+                  ),
+                );
+              },
+            ),
           ),
         ),
-      ),
       ],
     );
   }
@@ -641,8 +858,7 @@ class _HistoryCardState extends State<_HistoryCard> {
         if (event.logicalKey == LogicalKeyboardKey.select ||
             event.logicalKey == LogicalKeyboardKey.enter) {
           if (event is KeyDownEvent) {
-            _longPressTimer ??=
-                Timer(const Duration(milliseconds: 800), () {
+            _longPressTimer ??= Timer(const Duration(milliseconds: 800), () {
               _longPressTimer = null;
               _showDeleteDialog(context);
             });
@@ -663,7 +879,10 @@ class _HistoryCardState extends State<_HistoryCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           transform: Matrix4.diagonal3Values(
-              _isFocused ? 1.05 : 1.0, _isFocused ? 1.05 : 1.0, 1.0),
+            _isFocused ? 1.05 : 1.0,
+            _isFocused ? 1.05 : 1.0,
+            1.0,
+          ),
           transformAlignment: Alignment.center,
           width: isMobile ? 180 : 250,
           decoration: BoxDecoration(
@@ -679,7 +898,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                       color: AppColors.primary.withValues(alpha: 0.5),
                       blurRadius: 10,
                       spreadRadius: 2,
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -704,8 +923,11 @@ class _HistoryCardState extends State<_HistoryCard> {
                       Container(
                         color: Colors.black45,
                         child: const Center(
-                          child: Icon(Icons.play_circle_fill,
-                              color: Colors.white, size: 48),
+                          child: Icon(
+                            Icons.play_circle_fill,
+                            color: Colors.white,
+                            size: 48,
+                          ),
                         ),
                       ),
                   ],
@@ -715,8 +937,9 @@ class _HistoryCardState extends State<_HistoryCard> {
                 LinearProgressIndicator(
                   value: widget.item.positionMs / widget.item.durationMs,
                   backgroundColor: Colors.grey.shade900,
-                  valueColor:
-                      const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.primary,
+                  ),
                   minHeight: 4,
                 ),
               Padding(
@@ -728,13 +951,17 @@ class _HistoryCardState extends State<_HistoryCard> {
                       text: widget.item.movieTitle,
                       isFocused: _isFocused,
                       style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Episode ${widget.item.episodeNumber.toInt()}',
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -777,12 +1004,19 @@ class _HistoryCardState extends State<_HistoryCard> {
                     children: [
                       const Text(
                         'Delete History',
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'Remove "${widget.item.movieTitle}" from history?',
-                        style: const TextStyle(color: Colors.white70, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
                       ),
                       const SizedBox(height: 32),
                       Row(
@@ -821,7 +1055,9 @@ class _HistoryCardState extends State<_HistoryCard> {
         return FadeTransition(
           opacity: animation,
           child: ScaleTransition(
-            scale: Tween<double>(begin: 0.95, end: 1.0).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
             child: child,
           ),
         );
@@ -869,10 +1105,12 @@ class _TvDialogButtonState extends State<_TvDialogButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           transform: Matrix4.diagonal3Values(
-              _isFocused ? 1.05 : 1.0, _isFocused ? 1.05 : 1.0, 1.0),
+            _isFocused ? 1.05 : 1.0,
+            _isFocused ? 1.05 : 1.0,
+            1.0,
+          ),
           transformAlignment: Alignment.center,
-          padding:
-              const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           decoration: BoxDecoration(
             color: widget.isPrimary ? AppColors.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
@@ -886,16 +1124,17 @@ class _TvDialogButtonState extends State<_TvDialogButton> {
                       color: Colors.white.withValues(alpha: 0.3),
                       blurRadius: 8,
                       spreadRadius: 2,
-                    )
+                    ),
                   ]
                 : [],
           ),
           child: Text(
             widget.text,
             style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold),
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),

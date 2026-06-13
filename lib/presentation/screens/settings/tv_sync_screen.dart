@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/tunnel_service.dart';
 import '../../../data/services/webdav_service.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../di/injection.dart';
 import '../../bloc/history/history_cubit.dart';
 
@@ -148,14 +149,37 @@ class _TvSyncScreenState extends State<TvSyncScreen> {
           runSpacing: 40,
           children: [
             // Thẻ chứa QR bắt buộc phải nền trắng theo chuẩn UI/UX
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16),
-              child: QrImageView(
-                data: _qrData!, 
-                size: 300,
-                backgroundColor: Colors.white,
-              ),
+            Builder(
+              builder: (context) {
+                bool isFocused = false;
+                return StatefulBuilder(
+                  builder: (context, setState) => Focus(
+                    onFocusChange: (focused) => setState(() => isFocused = focused),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(
+                          color: isFocused ? AppColors.primary : Colors.transparent,
+                          width: 4,
+                        ),
+                        boxShadow: isFocused ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.6),
+                            blurRadius: 16,
+                            spreadRadius: 4,
+                          )
+                        ] : [],
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: QrImageView(
+                        data: _qrData!, 
+                        size: 300,
+                        backgroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                );
+              }
             ),
             const Column(
               mainAxisAlignment: MainAxisAlignment.center,

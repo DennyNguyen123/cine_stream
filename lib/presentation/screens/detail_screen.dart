@@ -41,6 +41,7 @@ class _DetailScreenState extends State<DetailScreen> {
   int _selectedPage = 0;
   bool _isPaginationInitialized = false;
 
+  late final FocusNode _backButtonNode;
   late final FocusNode _playButtonNode;
   late final FocusNode _firstServerNode;
   late final FocusNode _firstSeasonNode;
@@ -50,6 +51,7 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   void initState() {
     super.initState();
+    _backButtonNode = FocusNode();
     _playButtonNode = FocusNode();
     _firstServerNode = FocusNode();
     _firstSeasonNode = FocusNode();
@@ -63,6 +65,7 @@ class _DetailScreenState extends State<DetailScreen> {
     _seasonsScrollController.dispose();
     _pagesScrollController.dispose();
     _episodesScrollController.dispose();
+    _backButtonNode.dispose();
     _playButtonNode.dispose();
     _firstServerNode.dispose();
     _firstSeasonNode.dispose();
@@ -72,7 +75,7 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   List<FocusNode> _getAvailableRowNodes(MovieDetail detail) {
-    List<FocusNode> nodes = [_playButtonNode];
+    List<FocusNode> nodes = [_backButtonNode, _playButtonNode];
     if (detail.servers.isNotEmpty) nodes.add(_firstServerNode);
     
     final seasons = detail.episodes.map((e) => e.season).toSet().toList();
@@ -92,18 +95,24 @@ class _DetailScreenState extends State<DetailScreen> {
 
   FocusNode? _getNodeBelow(FocusNode currentRowNode, MovieDetail detail) {
     final nodes = _getAvailableRowNodes(detail);
+    if (nodes.isEmpty) return null;
     int index = nodes.indexOf(currentRowNode);
     if (index != -1 && index < nodes.length - 1) {
       return nodes[index + 1];
+    } else if (index == nodes.length - 1) {
+      return nodes.first;
     }
     return null;
   }
 
   FocusNode? _getNodeAbove(FocusNode currentRowNode, MovieDetail detail) {
     final nodes = _getAvailableRowNodes(detail);
+    if (nodes.isEmpty) return null;
     int index = nodes.indexOf(currentRowNode);
     if (index > 0) {
       return nodes[index - 1];
+    } else if (index == 0) {
+      return nodes.last;
     }
     return null;
   }
@@ -293,14 +302,14 @@ class _DetailScreenState extends State<DetailScreen> {
                           children: [
                             // Back button
                             Focus(
+                              focusNode: _backButtonNode,
                               onKeyEvent: (node, event) {
-                                if (event is KeyDownEvent &&
-                                    (event.logicalKey ==
-                                            LogicalKeyboardKey.select ||
-                                        event.logicalKey ==
-                                            LogicalKeyboardKey.enter)) {
-                                  Navigator.pop(context);
-                                  return KeyEventResult.handled;
+                                if (event is KeyDownEvent) {
+                                  if (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter) {
+                                    Navigator.pop(context);
+                                    return KeyEventResult.handled;
+                                  }
+                                  return _handleRowFocus(_backButtonNode, event, detail, () => Navigator.pop(context));
                                 }
                                 return KeyEventResult.ignored;
                               },

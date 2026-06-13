@@ -30,7 +30,9 @@ import '../../core/utils/stream_info_cache.dart';
 import '../widgets/debug_overlay.dart';
 
 import '../../domain/services/tts_service.dart';
+import '../../domain/services/tts_service.dart';
 import './settings/webdav_setup_screen.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class PlayerScreen extends StatefulWidget {
   final StreamInfo streamInfo;
@@ -129,6 +131,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
     // Warm up TTS engine
     getIt<TtsService>().init();
+    
+    // Keep screen awake while player is mounted
+    WakelockPlus.enable();
     
     final prefs = getIt<SharedPreferences>();
     _isVoiceOverEnabled = prefs.getBool('cinestream_tts_enabled') ?? false;
@@ -804,6 +809,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     getIt<TtsService>().dispose();
+    WakelockPlus.disable();
     _saveHistory(syncWebDav: true);
     _saveHistoryTimer?.cancel();
     _seekDebounceTimer?.cancel();
@@ -829,25 +835,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _handleBackPress() {
     if (_isPopping) return;
 
-    if (!_isPlaying) {
-       _exitPlayer();
-       return;
-    }
-
-    _backPressCount++;
-    if (_backPressCount >= 2) {
-      _exitPlayer();
-    } else {
-      if (_showControls) {
+    if (_showControls) {
+       if (!_isPlaying) {
+         _exitPlayer();
+       } else {
          setState(() => _showControls = false);
          _playerFocusNode.requestFocus();
-      } else {
-         _showToast('Bấm Back lần nữa để thoát');
-      }
-      _backPressTimer?.cancel();
-      _backPressTimer = Timer(const Duration(seconds: 2), () {
-        _backPressCount = 0;
-      });
+       }
+    } else {
+       _exitPlayer();
     }
   }
 
@@ -1740,6 +1736,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 final displayName = titleStr;
                     
                 return ListTile(
+                  autofocus: isCurrent,
                   focusColor: Colors.white24,
                   title: Text(
                     displayName, 
@@ -1794,7 +1791,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 }
                 final isCurrent = server.id == activeServerId;
                 return ListTile(
-                  autofocus: server == servers.first,
+                  autofocus: isCurrent,
                   focusColor: Colors.white24,
                   title: Text(server.name, style: TextStyle(color: isCurrent ? AppColors.primary : Colors.white)),
                   trailing: isCurrent ? const Icon(Icons.check, color: AppColors.primary) : null,

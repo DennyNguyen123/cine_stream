@@ -221,10 +221,9 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               style: const TextStyle(color: AppColors.text),
               decoration: InputDecoration(
                 labelText: 'Voice-over Target Language',
-                labelStyle: const TextStyle(color: AppColors.textDim),
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                labelStyle: const TextStyle(color: AppColors.textSecondary),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
               ),
               items: const [
                 DropdownMenuItem(value: 'vi', child: Text('Vietnamese (vi)')),
@@ -238,29 +237,36 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               },
             ),
             const SizedBox(height: 16),
-            Text('Voice-over Delay: ${_ttsDelayMs.toInt()} ms', style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 8),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Slider(
-                    value: _ttsDelayMs,
-                    min: -5000,
-                    max: 5000,
-                    divisions: 100,
-                    label: '${_ttsDelayMs.toInt()} ms',
-                    activeColor: AppColors.primary,
-                    inactiveColor: AppColors.border,
-                    onChanged: (val) {
-                      setState(() => _ttsDelayMs = val);
-                    },
-                  ),
+                const Text('Voice-over Delay', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w500)),
+                Row(
+                  children: [
+                    _buildDelayButton(Icons.remove, () {
+                      setState(() {
+                        _ttsDelayMs -= 100;
+                        if (_ttsDelayMs < -5000) _ttsDelayMs = -5000;
+                      });
+                    }),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 80,
+                      child: Text(
+                        '${_ttsDelayMs.toInt()} ms', 
+                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDelayButton(Icons.add, () {
+                      setState(() {
+                        _ttsDelayMs += 100;
+                        if (_ttsDelayMs > 5000) _ttsDelayMs = 5000;
+                      });
+                    }),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.restore, color: AppColors.textDim),
-                  tooltip: 'Reset Delay',
-                  onPressed: () => setState(() => _ttsDelayMs = 0),
-                )
               ],
             ),
             const Padding(
@@ -280,31 +286,20 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    autofocus: true,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: AppColors.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.qr_code, color: AppColors.text),
-                    label: const Text("Show QR", style: TextStyle(color: AppColors.text)),
-                    onPressed: () {
+                  child: _buildFocusableActionButton(
+                    icon: Icons.qr_code,
+                    label: 'Show QR',
+                    onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const TvSyncScreen()));
                     },
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: AppColors.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.qr_code_scanner, color: AppColors.text),
-                    label: const Text("Scan QR", style: TextStyle(color: AppColors.text)),
-                    onPressed: () {
+                  child: _buildFocusableActionButton(
+                    icon: Icons.qr_code_scanner,
+                    label: 'Scan QR',
+                    onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const MobileSyncScreen()));
                     },
                   ),
@@ -598,6 +593,89 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
         fontSize: 18,
         fontWeight: FontWeight.bold,
       ),
+    );
+  }
+
+  Widget _buildDelayButton(IconData icon, VoidCallback onTap) {
+    return Builder(
+      builder: (context) {
+        bool isFocused = false;
+        return StatefulBuilder(
+          builder: (context, setBtnState) {
+            return Focus(
+              onFocusChange: (focused) => setBtnState(() => isFocused = focused),
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent && 
+                   (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                  onTap();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isFocused ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isFocused ? AppColors.primary : AppColors.border,
+                      width: isFocused ? 2 : 1,
+                    ),
+                  ),
+                  child: Icon(icon, color: isFocused ? AppColors.primary : AppColors.text, size: 24),
+                ),
+              ),
+            );
+          }
+        );
+      }
+    );
+  }
+
+  Widget _buildFocusableActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    return Builder(
+      builder: (context) {
+        bool isFocused = false;
+        return StatefulBuilder(
+          builder: (context, setBtnState) {
+            return Focus(
+              onFocusChange: (focused) => setBtnState(() => isFocused = focused),
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent && 
+                   (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                  onTap();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: isFocused ? AppColors.primary.withValues(alpha: 0.2) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isFocused ? AppColors.primary : AppColors.border,
+                      width: isFocused ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: isFocused ? AppColors.primary : AppColors.text),
+                      const SizedBox(width: 8),
+                      Text(label, style: TextStyle(color: isFocused ? AppColors.primary : AppColors.text, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+        );
+      }
     );
   }
 }
