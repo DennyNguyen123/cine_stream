@@ -46,6 +46,7 @@ class PlayerScreen extends StatefulWidget {
   final List<Episode> allEpisodes;
   final String? serverId;
   final List<VideoServer>? servers;
+  final bool isAutoRetry;
 
   const PlayerScreen({
     super.key,
@@ -60,6 +61,7 @@ class PlayerScreen extends StatefulWidget {
     required this.allEpisodes,
     this.serverId,
     this.servers,
+    this.isAutoRetry = false,
   });
 
   @override
@@ -118,10 +120,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   
   double _videoVolume = 1.0;
   double _ttsVolume = 1.0;
+  
+  late bool _hasAutoRetried;
+  bool _isAutoRetrying = false;
 
   @override
   void initState() {
     super.initState();
+    _hasAutoRetried = widget.isAutoRetry;
     WidgetsBinding.instance.addObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
@@ -178,7 +184,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       }).catchError((e, stack) {
         if (!mounted) return;
         getIt<LogService>().error('Player initialization failed', e, stack);
-        _showErrorDialog("Player initialization failed:\n${e.toString()}");
+        _handlePlayerError("Player initialization failed:\n${e.toString()}");
       });
 
     _autoNext = prefs.getBool('auto_next') ?? true;
@@ -564,7 +570,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
 
     if (_controller.value.hasError && !_errorDialogShowing) {
-      _showErrorDialog("Video player error:\n${_controller.value.errorDescription}");
+      _handlePlayerError("Video player error:\n${_controller.value.errorDescription}");
     }
 
     if (_duration.inMilliseconds > 0 && _controller.value.position >= _duration && _autoNext && !_isChangingEpisode) {
@@ -602,7 +608,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
   }
 
-  void _changeEpisode(Episode nextEp) async {
+  void _changeEpisode(Episode nextEp, {bool isAutoRetry = false}) async {
     setState(() {
       _isChangingEpisode = true;
       _showControls = false;
@@ -644,6 +650,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             allEpisodes: widget.allEpisodes,
             serverId: widget.serverId,
             servers: widget.servers,
+            isAutoRetry: isAutoRetry,
           )),
         );
       } else {
@@ -696,6 +703,29 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       if (!mounted) return;
       setState(() => _isChangingEpisode = false);
       _showErrorDialog(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  void _handlePlayerError(String error) async {
+    if (_isAutoRetrying || _isChangingEpisode) return;
+
+    if (!_hasAutoRetried) {
+      _isAutoRetrying = true;
+      _hasAutoRetried = true;
+      getIt<LogService>().log('[PlayerScreen] Auto-retrying dead stream...');
+      
+      // Clear cache before retrying
+      await StreamInfoCache.clearCache(
+        widget.movieId, 
+        widget.episodeId, 
+        widget.streamInfo.currentServerId ?? widget.serverId
+      );
+
+      // Retry current episode on current server
+      final ep = widget.allEpisodes.firstWhere((e) => e.id == widget.episodeId, orElse: () => widget.allEpisodes.first);
+      _changeEpisode(ep, isAutoRetry: true);
+    } else {
+      _showErrorDialog(error);
     }
   }
 
