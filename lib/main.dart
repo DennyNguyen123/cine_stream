@@ -1,14 +1,30 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'core/theme/app_theme.dart';
 import 'di/injection.dart';
 import 'presentation/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  if (Platform.isWindows) {
+    try {
+      final availableVersion = await WebViewEnvironment.getAvailableVersion();
+      if (availableVersion != null) {
+        await WebViewEnvironment.create();
+      } else {
+        debugPrint('WebView2 Runtime is not installed on this system.');
+      }
+    } catch (e) {
+      debugPrint('Failed to initialize WebViewEnvironment: $e');
+    }
+  }
+
   MediaKit.ensureInitialized();
   VideoPlayerMediaKit.ensureInitialized(windows: true, linux: true);
   await setupInjection();

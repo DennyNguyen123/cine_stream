@@ -15,6 +15,17 @@ class OpenAiTtsImpl implements TtsService {
 
   CancelToken? _cancelToken;
   bool _isDisposed = false;
+  Completer<void>? _playCompleter;
+
+  final Map<String, Uint8List> _prefetchCache = {};
+  static const int _maxCacheSize = 30;
+
+  void _addToCache(String key, Uint8List bytes) {
+    if (_prefetchCache.length >= _maxCacheSize) {
+      _prefetchCache.remove(_prefetchCache.keys.first);
+    }
+    _prefetchCache[key] = bytes;
+  }
 
   // Mutex đơn giản sử dụng Future chain để đảm bảo stop và play chạy tuần tự,
   // tránh IllegalStateException trên ExoPlayer khi nhiều âm thanh được trigger dồn dập.
@@ -89,15 +100,40 @@ class OpenAiTtsImpl implements TtsService {
     return completer.future;
   }
 
-  Future<void> _executeSpeak(
+  @override
+  Future<void> prefetch(
+    String text, {
+    required int durationMs,
+    required double videoPlaybackSpeed,
+    String? languageCode,
+  }) async {
+    String cleanText = text.replaceAll(RegExp(r'<[^>]*>'), '');
+    cleanText = cleanText.replaceAll('♪', '').trim();
+    if (cleanText.isEmpty) return;
+
+    if (cleanText.length > 500) {
+      cleanText = cleanText.substring(0, 500);
+    }
+
+    final cacheKey = '${cleanText}_${durationMs}_$videoPlaybackSpeed';
+    if (_prefetchCache.containsKey(cacheKey)) return;
+
+    try {
+      final bytes = await _generateSpeechBytes(cleanText, durationMs, videoPlaybackSpeed, languageCode, null);
+      _addToCache(cacheKey, bytes);
+      print('[OpenAI TTS] Prefetched and cached speech for text: "$cleanText"');
+    } catch (_) {
+      // Prefetch fails silently
+    }
+  }
+
+  Future<Uint8List> _generateSpeechBytes(
     String text,
     int durationMs,
     double videoPlaybackSpeed,
     String? languageCode,
+    CancelToken? cancelToken,
   ) async {
-    // 1. Stop bất kỳ luồng phát hiện tại và cancel API request cũ
-    await stop();
-
     final apiKey = _prefs.getString('tts_api_key') ?? '';
     final baseUrlRaw = _prefs.getString('tts_base_url') ?? '';
     final model = _prefs.getString('tts_model') ?? 'tts-1';
@@ -107,73 +143,105 @@ class OpenAiTtsImpl implements TtsService {
     var cleanUrl = _sanitizeConfig(baseUrlRaw);
 
     if (cleanKey.isEmpty || cleanUrl.isEmpty) {
-      // API Key hoặc Base URL trống thì nhảy sang ném Exception để fallback ngay
       throw Exception('OpenAI API credentials not configured');
     }
 
-    // Sanitize Base URL
     if (cleanUrl.endsWith('/')) {
       cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
     }
     final fullUrl = '$cleanUrl/audio/speech';
     
-    // Log Hex và key length để kiểm tra ký tự lạ
-    final hexUrl = cleanUrl.codeUnits.map((u) => u.toRadixString(16).padLeft(4, '0')).join(' ');
-    print('[OpenAI TTS] cleanUrl: "$cleanUrl"');
-    print('[OpenAI TTS] cleanUrl Hex: $hexUrl');
-    print('[OpenAI TTS] cleanKey length: ${cleanKey.length}, first 4: ${cleanKey.length > 4 ? cleanKey.substring(0, 4) : cleanKey}');
-    print('[OpenAI TTS] Payload: model=$model, voice=$voice, speed=$videoPlaybackSpeed');
-
-    _cancelToken = CancelToken();
-
-    // 2. Gọi API OpenAI TTS POST
-    final Response<List<int>> response;
-    try {
-      response = await _dio.post<List<int>>(
-        fullUrl,
-        data: {
-          'model': model,
-          'input': text,
-          'voice': voice,
-          'speed': videoPlaybackSpeed,
-        },
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $cleanKey',
-            'Content-Type': 'application/json',
-          },
-          responseType: ResponseType.bytes,
-        ),
-        cancelToken: _cancelToken,
-      );
-    } on DioException catch (e) {
-      String responseBody = '';
-      if (e.response?.data is List<int>) {
-        try {
-          responseBody = String.fromCharCodes(e.response!.data as List<int>);
-        } catch (_) {}
-      } else if (e.response?.data is String) {
-        responseBody = e.response!.data as String;
+    // Tính toán tốc độ đọc tự động dựa trên độ dài văn bản và thời gian hiển thị
+    double speedMultiplier = 1.25; // Nâng tốc độ nền lên thêm 25%
+    if (durationMs > 0) {
+      final cleanText = text.replaceAll(RegExp(r'\[.*?\]|\(.*?\)', dotAll: true), '').trim();
+      final wordCount = cleanText.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+      if (wordCount > 0) {
+        // Ước lượng thời gian cần thiết (tăng 20% độ nhạy): tối thiểu 456ms cho mỗi từ và 96ms cho mỗi ký tự
+        final estimatedMsByWords = wordCount * 456;
+        final estimatedMsByChars = cleanText.length * 96;
+        final estimatedMs = estimatedMsByWords > estimatedMsByChars ? estimatedMsByWords : estimatedMsByChars;
+        
+        final calculatedMultiplier = estimatedMs / durationMs;
+        if (calculatedMultiplier > speedMultiplier) {
+          speedMultiplier = calculatedMultiplier;
+        }
       }
-      print('[OpenAI TTS] DioException details: statusCode=${e.response?.statusCode}, message=${e.message}, responseBody=$responseBody');
-      rethrow;
     }
+    if (speedMultiplier > 5.0) {
+      speedMultiplier = 5.0; // Trần tốc độ 5x theo yêu cầu
+    }
+    // Giới hạn an toàn của OpenAI API là 4.0x
+    final finalSpeed = (speedMultiplier * videoPlaybackSpeed).clamp(0.25, 4.0);
+
+    final Response<List<int>> response = await _dio.post<List<int>>(
+      fullUrl,
+      data: {
+        'model': model,
+        'input': text,
+        'voice': voice,
+        'speed': finalSpeed,
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $cleanKey',
+          'Content-Type': 'application/json',
+        },
+        responseType: ResponseType.bytes,
+      ),
+      cancelToken: cancelToken,
+    );
 
     if (response.data == null || response.statusCode != 200) {
       throw Exception('Failed to fetch TTS from OpenAI');
     }
 
+    return Uint8List.fromList(response.data!);
+  }
+
+  Future<void> _executeSpeak(
+    String text,
+    int durationMs,
+    double videoPlaybackSpeed,
+    String? languageCode,
+  ) async {
+    await stop();
+    _cancelToken = CancelToken();
+
+    final cacheKey = '${text}_${durationMs}_$videoPlaybackSpeed';
+    Uint8List bytes;
+    if (_prefetchCache.containsKey(cacheKey)) {
+      bytes = _prefetchCache.remove(cacheKey)!;
+      print('[OpenAI TTS] Cache hit for text: "$text"');
+    } else {
+      bytes = await _generateSpeechBytes(text, durationMs, videoPlaybackSpeed, languageCode, _cancelToken);
+    }
+
     if (_isDisposed) return;
 
-    // 3. Phát âm thanh bằng BytesSource
-    final bytes = Uint8List.fromList(response.data!);
-    await _player.play(BytesSource(bytes));
+    _playCompleter = Completer<void>();
+    final subscription = _player.onPlayerComplete.listen((_) {
+      if (_playCompleter != null && !_playCompleter!.isCompleted) {
+        _playCompleter!.complete();
+      }
+    });
+
+    try {
+      await _player.play(BytesSource(bytes));
+      await _playCompleter!.future;
+    } finally {
+      await subscription.cancel();
+      _playCompleter = null;
+    }
   }
 
   @override
   Future<void> stop() async {
     _cancelToken?.cancel('Speech stopped');
     _cancelToken = null;
+    if (_playCompleter != null && !_playCompleter!.isCompleted) {
+      _playCompleter!.complete();
+    }
     try {
       await _player.stop();
     } catch (_) {}

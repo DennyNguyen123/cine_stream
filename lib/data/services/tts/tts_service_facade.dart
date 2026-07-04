@@ -51,6 +51,21 @@ class TtsServiceFacade implements TtsService {
   }
 
   @override
+  Future<void> prefetch(
+    String text, {
+    required int durationMs,
+    required double videoPlaybackSpeed,
+    String? languageCode,
+  }) async {
+    await _activeService.prefetch(
+      text,
+      durationMs: durationMs,
+      videoPlaybackSpeed: videoPlaybackSpeed,
+      languageCode: languageCode,
+    );
+  }
+
+  @override
   Future<void> stop() async {
     await _nativeTts.stop();
     await _openAiTts.stop();

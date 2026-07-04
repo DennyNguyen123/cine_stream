@@ -6,6 +6,12 @@ abstract class TtsService {
     required double videoPlaybackSpeed,
     String? languageCode,
   });
+  Future<void> prefetch(
+    String text, {
+    required int durationMs,
+    required double videoPlaybackSpeed,
+    String? languageCode,
+  });
   Future<void> stop();
   Future<void> setVolume(double volume);
   Future<void> dispose();

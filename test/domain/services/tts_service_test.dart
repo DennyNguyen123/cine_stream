@@ -77,6 +77,10 @@ class MockAudioPlayer extends AudioPlayer {
   bool isDisposeCalled = false;
   Source? lastSource;
   final List<String> callOrder = [];
+  final _completeController = StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get onPlayerComplete => _completeController.stream;
 
   @override
   Future<void> stop() async {
@@ -98,11 +102,13 @@ class MockAudioPlayer extends AudioPlayer {
     lastSource = source;
     callOrder.add('play');
     await Future.delayed(const Duration(milliseconds: 10));
+    _completeController.add(null);
   }
 
   @override
   Future<void> dispose() async {
     isDisposeCalled = true;
+    await _completeController.close();
   }
 }
 
@@ -301,7 +307,7 @@ void main() {
       await openAiImpl.speak('Speed check', durationMs: 2000, videoPlaybackSpeed: 2.0);
 
       final dataMap = mockDio.lastData as Map<String, dynamic>;
-      expect(dataMap['speed'], equals(2.0));
+      expect(dataMap['speed'], equals(2.5));
     });
 
     test('8. Resource Disposal', () async {
@@ -422,6 +428,23 @@ void main() {
       mockTts.lastSpokenText = null;
       await nativeImpl.speak('♪ Music ♪', durationMs: 2000, videoPlaybackSpeed: 1.0);
       expect(mockTts.lastSpokenText, equals('Music'));
+    });
+
+    test('13. Adaptive Speech Rate Validation', () async {
+      await prefs.setString('tts_api_key', 'key');
+      await prefs.setString('tts_base_url', 'url');
+      final mockDio = MockDio();
+      final mockPlayer = MockAudioPlayer();
+      final nativeImpl = NativeTtsImpl(tts: MockFlutterTts());
+      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+
+      // Một câu thoại dài 10 từ (khoảng 4560ms ở tốc độ 1.0 với độ nhạy tăng 20%)
+      // Nếu thời gian hiển thị là 2000ms, tốc độ được tính toán là: 4560 / 2000 = 2.28x
+      await openAiImpl.speak('One two three four five six seven eight nine ten', durationMs: 2000, videoPlaybackSpeed: 1.0);
+
+      expect(mockDio.lastData, isNotNull);
+      final dataMap = mockDio.lastData as Map<String, dynamic>;
+      expect(dataMap['speed'], closeTo(2.3, 0.05));
     });
   });
 }

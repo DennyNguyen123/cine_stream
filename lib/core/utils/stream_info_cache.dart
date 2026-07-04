@@ -24,18 +24,7 @@ class StreamInfoCache {
   }
 
   static StreamInfo? getStreamInfo(String movieId, String episodeId, String? serverId) {
-    try {
-      final prefs = getIt<SharedPreferences>();
-      final key = _generateKey(movieId, episodeId, serverId);
-      final jsonString = prefs.getString(key);
-      if (jsonString != null && jsonString.isNotEmpty) {
-        final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
-        debugPrint('StreamInfoCache: Hit cache for $key');
-        return StreamInfo.fromJson(jsonMap);
-      }
-    } catch (e) {
-      debugPrint('StreamInfoCache Error getting cache: $e');
-    }
+    // Tạm bỏ cơ chế lưu cache m3u8
     return null;
   }
 

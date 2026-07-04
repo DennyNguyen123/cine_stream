@@ -143,6 +143,16 @@ class NativeTtsImpl implements TtsService {
   }
 
   @override
+  Future<void> prefetch(
+    String text, {
+    required int durationMs,
+    required double videoPlaybackSpeed,
+    String? languageCode,
+  }) async {
+    // No-op for Native TTS because it runs offline.
+  }
+
+  @override
   Future<void> dispose() async {
     await stop();
   }

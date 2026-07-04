@@ -48,7 +48,7 @@ class PlayerScreen extends StatefulWidget {
   final List<Episode> allEpisodes;
   final String? serverId;
   final List<VideoServer>? servers;
-  final bool isAutoRetry;
+  final int retryCount;
 
   const PlayerScreen({
     super.key,
@@ -63,7 +63,7 @@ class PlayerScreen extends StatefulWidget {
     required this.allEpisodes,
     this.serverId,
     this.servers,
-    this.isAutoRetry = false,
+    this.retryCount = 0,
   });
 
   @override
@@ -74,7 +74,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   late VideoPlayerController _controller;
   
   bool _showControls = true;
-  Duration _position = Duration.zero;
+  late Duration _position;
   Duration _duration = Duration.zero;
   bool _isPlaying = true;
   bool _isBuffering = true;
@@ -87,6 +87,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Timer? _seekDebounceTimer;
   Timer? _saveHistoryTimer;
   Timer? _hideControlsTimer;
+  Timer? _initTimeoutTimer;
   
   int _seekAccumulator = 0;
   Timer? _seekOverlayTimer;
@@ -123,13 +124,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   double _videoVolume = 1.0;
   double _ttsVolume = 1.0;
   
-  late bool _hasAutoRetried;
   bool _isAutoRetrying = false;
+  int? _positionBeforeErrorMs;
 
   @override
   void initState() {
     super.initState();
-    _hasAutoRetried = widget.isAutoRetry;
+    _position = Duration(milliseconds: widget.startPositionMs);
     WidgetsBinding.instance.addObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
@@ -184,17 +185,27 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         );
       }
       
-      _controller.initialize().then((_) {
+      _initTimeoutTimer = Timer(const Duration(seconds: 15), () {
+        if (mounted && !_controller.value.isInitialized && !_errorDialogShowing) {
+          getIt<LogService>().log('[PlayerScreen] Video initialization timeout after 15s.');
+          _handlePlayerError("Connection timeout. Please check your network or try again.");
+        }
+      });
+
+      _controller.initialize().then((_) async {
+        _initTimeoutTimer?.cancel();
         setState(() {
           _duration = _controller.value.duration;
         });
+        await _controller.setPlaybackSpeed(_playbackSpeed);
+        await _controller.setVolume(_videoVolume);
         if (widget.startPositionMs > 0) {
-          _controller.seekTo(Duration(milliseconds: widget.startPositionMs));
+          await Future.delayed(const Duration(milliseconds: 200));
+          await _controller.seekTo(Duration(milliseconds: widget.startPositionMs));
         }
-        _controller.setPlaybackSpeed(_playbackSpeed);
-        _controller.setVolume(_videoVolume);
-        _controller.play();
+        await _controller.play();
       }).catchError((e, stack) {
+        _initTimeoutTimer?.cancel();
         if (!mounted) return;
         getIt<LogService>().error('Player initialization failed', e, stack);
         _handlePlayerError("Player initialization failed:\n${e.toString()}");
@@ -480,6 +491,20 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _videoListener() {
     if (!mounted) return;
     
+    if (_controller.value.hasError) {
+      _positionBeforeErrorMs ??= _position.inMilliseconds;
+      if (!_errorDialogShowing) {
+        _handlePlayerError("Video player error:\n${_controller.value.errorDescription}");
+      }
+      return;
+    }
+
+    // Nếu video bị tạm dừng, tắt ngay giọng đọc TTS đang phát
+    final isNowPlaying = _controller.value.isPlaying;
+    if (_isPlaying && !isNowPlaying) {
+      getIt<TtsService>().stop();
+    }
+
     final posMsTop = _controller.value.position.inMilliseconds - _topSubDelayMs;
     final posMsBottom = _controller.value.position.inMilliseconds - _bottomSubDelayMs;
     
@@ -518,7 +543,52 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       final posMsTts = _controller.value.position.inMilliseconds - ttsDelayMs.toInt();
       
       _lastTtsIndex = _findActiveCueIndex(_primaryCues, posMsTts, _lastTtsIndex);
-      if (_lastTtsIndex != -1) activeTtsCue = _primaryCues[_lastTtsIndex];
+      if (_lastTtsIndex != -1) {
+        activeTtsCue = _primaryCues[_lastTtsIndex];
+
+        if (_isVoiceOverEnabled && _isPlaying) {
+          final targetLang = prefs.getString('tts_target_lang') ?? 'vi';
+          final currentSubLang = _selectedSub?.languageCode;
+
+          for (int i = 1; i <= 3; i++) {
+            final nextIndex = _lastTtsIndex + i;
+            if (nextIndex < _primaryCues.length) {
+              final nextCue = _primaryCues[nextIndex];
+              final nextCleanText = nextCue.text.replaceAll(RegExp(r'\[.*?\]|\(.*?\)', dotAll: true), '').trim();
+              if (nextCleanText.isNotEmpty) {
+                final nextDuration = nextCue.endMs - nextCue.startMs;
+                if (currentSubLang != null && currentSubLang != targetLang) {
+                  if (!_ttsTranslationCache.containsKey(nextCleanText)) {
+                    getIt<TranslationService>().translate(nextCleanText, targetLang: targetLang).then((translated) {
+                      _ttsTranslationCache[nextCleanText] = translated;
+                      getIt<TtsService>().prefetch(
+                        translated,
+                        durationMs: nextDuration,
+                        videoPlaybackSpeed: _playbackSpeed,
+                        languageCode: targetLang,
+                      );
+                    }).catchError((_) {});
+                  } else {
+                    getIt<TtsService>().prefetch(
+                      _ttsTranslationCache[nextCleanText]!,
+                      durationMs: nextDuration,
+                      videoPlaybackSpeed: _playbackSpeed,
+                      languageCode: targetLang,
+                    );
+                  }
+                } else {
+                  getIt<TtsService>().prefetch(
+                    nextCleanText,
+                    durationMs: nextDuration,
+                    videoPlaybackSpeed: _playbackSpeed,
+                    languageCode: targetLang,
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     if (_isVoiceOverEnabled && activeTtsCue != null && activeTtsCue != _lastSpokenCue && !_isSeeking && _isPlaying) {
@@ -582,10 +652,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       });
     }
 
-    if (_controller.value.hasError && !_errorDialogShowing) {
-      _handlePlayerError("Video player error:\n${_controller.value.errorDescription}");
-    }
-
     if (_duration.inMilliseconds > 0 && _controller.value.position >= _duration && _autoNext && !_isChangingEpisode) {
       _playNextEpisode();
     }
@@ -621,10 +687,12 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
   }
 
-  void _changeEpisode(Episode nextEp, {bool isAutoRetry = false}) async {
+  void _changeEpisode(Episode nextEp, {bool isAutoRetry = false, int? customStartPositionMs, int nextRetryCount = 0}) async {
+    final startPos = customStartPositionMs ?? (isAutoRetry ? _position.inMilliseconds : 0);
     setState(() {
       _isChangingEpisode = true;
       _showControls = false;
+      _positionBeforeErrorMs = null; // Reset vị trí lỗi khi chuyển tập
     });
     
     _controller.pause();
@@ -671,11 +739,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
             thumbnail: widget.thumbnail,
             episodeId: nextEp.id,
             episodeNumber: nextEp.number,
-            startPositionMs: 0,
+            startPositionMs: startPos,
             allEpisodes: widget.allEpisodes,
             serverId: widget.serverId,
             servers: widget.servers,
-            isAutoRetry: isAutoRetry,
+            retryCount: nextRetryCount,
           )),
         );
       } else {
@@ -743,24 +811,31 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
   }
 
+  Future<void> _clearAllStreamCache() async {
+    await StreamInfoCache.clearCache(widget.movieId, widget.episodeId, widget.serverId);
+    await StreamInfoCache.clearCache(widget.movieId, widget.episodeId, widget.streamInfo.currentServerId);
+    await StreamInfoCache.clearCache(widget.movieId, widget.episodeId, null);
+  }
+
   void _handlePlayerError(String error) async {
     if (_isAutoRetrying || _isChangingEpisode) return;
 
-    if (!_hasAutoRetried) {
+    final resumePos = _positionBeforeErrorMs ?? _position.inMilliseconds;
+
+    if (widget.retryCount < 2) {
       _isAutoRetrying = true;
-      _hasAutoRetried = true;
-      getIt<LogService>().log('[PlayerScreen] Auto-retrying dead stream...');
+      getIt<LogService>().log('[PlayerScreen] Auto-retrying dead stream (Attempt ${widget.retryCount + 1}/2)...');
       
-      // Clear cache before retrying
-      await StreamInfoCache.clearCache(
-        widget.movieId, 
-        widget.episodeId, 
-        widget.streamInfo.currentServerId ?? widget.serverId
-      );
+      await _clearAllStreamCache();
 
       // Retry current episode on current server
-      final ep = widget.allEpisodes.firstWhere((e) => e.id == widget.episodeId, orElse: () => widget.allEpisodes.first);
-      _changeEpisode(ep, isAutoRetry: true);
+      final Episode ep;
+      if (widget.allEpisodes.isEmpty) {
+        ep = Episode(id: widget.episodeId, number: 1);
+      } else {
+        ep = widget.allEpisodes.firstWhere((e) => e.id == widget.episodeId, orElse: () => widget.allEpisodes.first);
+      }
+      _changeEpisode(ep, isAutoRetry: true, customStartPositionMs: resumePos, nextRetryCount: widget.retryCount + 1);
     } else {
       _showErrorDialog(error);
     }
@@ -807,16 +882,16 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
               Navigator.pop(context);
               setState(() => _errorDialogShowing = false);
               
-              // Clear cache before retrying
-              await StreamInfoCache.clearCache(
-                widget.movieId, 
-                widget.episodeId, 
-                widget.streamInfo.currentServerId ?? widget.serverId
-              );
+              await _clearAllStreamCache();
 
               // Retry current episode on current server
-              final ep = widget.allEpisodes.firstWhere((e) => e.id == widget.episodeId, orElse: () => widget.allEpisodes.first);
-              _changeEpisode(ep);
+              final Episode ep;
+              if (widget.allEpisodes.isEmpty) {
+                ep = Episode(id: widget.episodeId, number: 1);
+              } else {
+                ep = widget.allEpisodes.firstWhere((e) => e.id == widget.episodeId, orElse: () => widget.allEpisodes.first);
+              }
+              _changeEpisode(ep, customStartPositionMs: _positionBeforeErrorMs, nextRetryCount: 0);
             },
             child: const Text('Retry', style: TextStyle(color: Colors.white)),
           ),
@@ -879,6 +954,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     WakelockPlus.disable();
     _saveHistory(syncWebDav: true);
     _saveHistoryTimer?.cancel();
+    _initTimeoutTimer?.cancel();
     _seekDebounceTimer?.cancel();
     _hideControlsTimer?.cancel();
     _backPressTimer?.cancel();
@@ -1043,7 +1119,23 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                         aspectRatio: _controller.value.aspectRatio,
                         child: VideoPlayer(_controller),
                       )
-                    : const CircularProgressIndicator(color: AppColors.primary),
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircularProgressIndicator(color: AppColors.primary),
+                          if (widget.retryCount > 0) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              'Retrying ${widget.retryCount}/2...',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
               ),
               
               // Double tap zones

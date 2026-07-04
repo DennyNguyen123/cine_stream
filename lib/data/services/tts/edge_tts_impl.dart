@@ -20,6 +20,17 @@ class EdgeTtsImpl implements TtsService {
   bool _isDisposed = false;
   Future<void> _lock = Future.value();
   CancelToken? _cancelToken;
+  Completer<void>? _playCompleter;
+
+  final Map<String, Uint8List> _prefetchCache = {};
+  static const int _maxCacheSize = 30;
+
+  void _addToCache(String key, Uint8List bytes) {
+    if (_prefetchCache.length >= _maxCacheSize) {
+      _prefetchCache.remove(_prefetchCache.keys.first);
+    }
+    _prefetchCache[key] = bytes;
+  }
 
   static const String _userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -177,28 +188,75 @@ class EdgeTtsImpl implements TtsService {
     return completer.future;
   }
 
-  Future<void> _executeSpeak(
+  @override
+  Future<void> prefetch(
+    String text, {
+    required int durationMs,
+    required double videoPlaybackSpeed,
+    String? languageCode,
+  }) async {
+    String cleanText = text.replaceAll(RegExp(r'<[^>]*>'), '');
+    cleanText = cleanText.replaceAll('♪', '').trim();
+    if (cleanText.isEmpty) return;
+
+    if (cleanText.length > 500) {
+      cleanText = cleanText.substring(0, 500);
+    }
+
+    final cacheKey = '${cleanText}_${durationMs}_$videoPlaybackSpeed';
+    if (_prefetchCache.containsKey(cacheKey)) return;
+
+    try {
+      final bytes = await _generateSpeechBytes(cleanText, durationMs, videoPlaybackSpeed, languageCode, null);
+      _addToCache(cacheKey, bytes);
+      debugPrint('[EdgeTTS] Prefetched and cached speech for text: "$cleanText"');
+    } catch (_) {
+      // Prefetch fails silently
+    }
+  }
+
+  Future<Uint8List> _generateSpeechBytes(
     String text,
     int durationMs,
     double videoPlaybackSpeed,
     String? languageCode,
+    CancelToken? cancelToken,
   ) async {
-    await stop();
-
     final voice = _prefs.getString('tts_voice') ?? 'vi-VN-HoaiMyNeural';
-
-    _cancelToken = CancelToken();
 
     await _getToken();
 
+    // Tính toán tốc độ đọc tự động dựa trên độ dài văn bản và thời gian hiển thị
+    double speedMultiplier = 1.25; // Nâng tốc độ nền lên thêm 25%
+    if (durationMs > 0) {
+      final cleanText = text.replaceAll(RegExp(r'\[.*?\]|\(.*?\)', dotAll: true), '').trim();
+      final wordCount = cleanText.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+      if (wordCount > 0) {
+        // Ước lượng thời gian cần thiết (tăng 20% độ nhạy): tối thiểu 456ms cho mỗi từ và 96ms cho mỗi ký tự
+        final estimatedMsByWords = wordCount * 456;
+        final estimatedMsByChars = cleanText.length * 96;
+        final estimatedMs = estimatedMsByWords > estimatedMsByChars ? estimatedMsByWords : estimatedMsByChars;
+        
+        final calculatedMultiplier = estimatedMs / durationMs;
+        if (calculatedMultiplier > speedMultiplier) {
+          speedMultiplier = calculatedMultiplier;
+        }
+      }
+    }
+    if (speedMultiplier > 5.0) {
+      speedMultiplier = 5.0; // Trần tốc độ 5x theo yêu cầu
+    }
+    // Giới hạn an toàn của Edge TTS API là 4.0x (tương đương prosody +300%)
+    final finalSpeed = (speedMultiplier * videoPlaybackSpeed).clamp(0.25, 4.0);
+
     Response<List<int>> response;
     try {
-      response = await _sendTtsRequest(text, voice, videoPlaybackSpeed, _cancelToken);
+      response = await _sendTtsRequest(text, voice, finalSpeed, cancelToken);
     } on DioException catch (e) {
       if (e.response?.statusCode == 403 || e.response?.statusCode == 429) {
         debugPrint('[EdgeTTS] Token expired or rate limited (status ${e.response?.statusCode}), retrying...');
         await _getToken(forceRefresh: true);
-        response = await _sendTtsRequest(text, voice, videoPlaybackSpeed, _cancelToken);
+        response = await _sendTtsRequest(text, voice, finalSpeed, cancelToken);
       } else {
         rethrow;
       }
@@ -208,20 +266,56 @@ class EdgeTtsImpl implements TtsService {
       throw Exception('Failed to fetch TTS from Edge (status ${response.statusCode})');
     }
 
-    if (_isDisposed) return;
-
     final bytes = Uint8List.fromList(response.data!);
     if (bytes.length < 1024) {
       throw Exception('Edge TTS returned empty audio');
     }
+    return bytes;
+  }
 
-    await _player.play(BytesSource(bytes));
+  Future<void> _executeSpeak(
+    String text,
+    int durationMs,
+    double videoPlaybackSpeed,
+    String? languageCode,
+  ) async {
+    await stop();
+    _cancelToken = CancelToken();
+
+    final cacheKey = '${text}_${durationMs}_$videoPlaybackSpeed';
+    Uint8List bytes;
+    if (_prefetchCache.containsKey(cacheKey)) {
+      bytes = _prefetchCache.remove(cacheKey)!;
+      debugPrint('[EdgeTTS] Cache hit for text: "$text"');
+    } else {
+      bytes = await _generateSpeechBytes(text, durationMs, videoPlaybackSpeed, languageCode, _cancelToken);
+    }
+
+    if (_isDisposed) return;
+
+    _playCompleter = Completer<void>();
+    final subscription = _player.onPlayerComplete.listen((_) {
+      if (_playCompleter != null && !_playCompleter!.isCompleted) {
+        _playCompleter!.complete();
+      }
+    });
+
+    try {
+      await _player.play(BytesSource(bytes));
+      await _playCompleter!.future;
+    } finally {
+      await subscription.cancel();
+      _playCompleter = null;
+    }
   }
 
   @override
   Future<void> stop() async {
     _cancelToken?.cancel('Speech stopped');
     _cancelToken = null;
+    if (_playCompleter != null && !_playCompleter!.isCompleted) {
+      _playCompleter!.complete();
+    }
     try {
       await _player.stop();
     } catch (_) {}
