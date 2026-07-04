@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/services/tts_service.dart';
 import '../data/services/tts/native_tts_impl.dart';
 import '../data/services/tts/openai_tts_impl.dart';
+import '../data/services/tts/edge_tts_impl.dart';
 import '../data/services/tts/tts_service_facade.dart';
 
 import '../data/repositories/history_repository.dart';
@@ -48,11 +49,18 @@ Future<void> setupInjection() async {
     prefs: prefs,
     nativeFallback: nativeTts,
   );
+  final edgeTts = EdgeTtsImpl(
+    dio: getIt<Dio>(),
+    prefs: prefs,
+  );
+  getIt.registerSingleton<EdgeTtsImpl>(edgeTts);
+  
   getIt.registerLazySingleton<TtsService>(
     () => TtsServiceFacade(
       prefs: prefs,
       nativeTts: nativeTts,
       openAiTts: openAiTts,
+      edgeTts: edgeTts,
     ),
   );
 

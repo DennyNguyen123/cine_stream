@@ -389,6 +389,7 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               items: const [
                 DropdownMenuItem(value: 'native', child: Text('System Default')),
                 DropdownMenuItem(value: 'openai', child: Text('OpenAI Compatible')),
+                DropdownMenuItem(value: 'edge', child: Text('Microsoft Edge (Free)')),
               ],
               onChanged: (val) {
                 if (val != null) {
@@ -396,6 +397,8 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                     _ttsEngine = val;
                     if (val == 'native') {
                       _ttsVoice = _systemVoices.isNotEmpty ? _systemVoices.first : '';
+                    } else if (val == 'edge') {
+                      _ttsVoice = 'vi-VN-HoaiMyNeural';
                     } else {
                       _ttsVoice = 'alloy';
                     }
@@ -461,6 +464,43 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
                   focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
                 ),
+              ),
+            ] else if (_ttsEngine == 'edge') ...[
+              // Edge TTS Voice Selection
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: [
+                  'vi-VN-HoaiMyNeural',
+                  'vi-VN-NamMinhNeural',
+                  'en-US-AvaNeural',
+                  'en-US-AndrewNeural',
+                  'en-US-EmmaNeural',
+                  'en-US-BrianNeural'
+                ].contains(_ttsVoice) ? _ttsVoice : 'vi-VN-HoaiMyNeural',
+                focusNode: _ttsVoiceFocus,
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: AppColors.text, fontSize: 14),
+                decoration: const InputDecoration(
+                  labelText: 'Edge TTS Voice',
+                  labelStyle: TextStyle(color: AppColors.textSecondary),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'vi-VN-HoaiMyNeural', child: Text('Hoài Mỹ (Nữ Nam - vi-VN)')),
+                  DropdownMenuItem(value: 'vi-VN-NamMinhNeural', child: Text('Nam Minh (Nam Bắc - vi-VN)')),
+                  DropdownMenuItem(value: 'en-US-AvaNeural', child: Text('Ava (Nữ - en-US)')),
+                  DropdownMenuItem(value: 'en-US-AndrewNeural', child: Text('Andrew (Nam - en-US)')),
+                  DropdownMenuItem(value: 'en-US-EmmaNeural', child: Text('Emma (Nữ - en-US)')),
+                  DropdownMenuItem(value: 'en-US-BrianNeural', child: Text('Brian (Nam - en-US)')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() { 
+                      _ttsVoice = val; 
+                    });
+                  }
+                },
               ),
             ] else ...[
               // System Default Engine Voice Selection
