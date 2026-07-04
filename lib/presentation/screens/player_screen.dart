@@ -875,7 +875,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    getIt<TtsService>().dispose();
+    getIt<TtsService>().stop();
     WakelockPlus.disable();
     _saveHistory(syncWebDav: true);
     _saveHistoryTimer?.cancel();

@@ -9,6 +9,7 @@ import 'package:cine_stream/data/services/tts/native_tts_impl.dart';
 import 'package:cine_stream/domain/services/tts_service.dart';
 import 'package:cine_stream/data/services/tts/tts_service_facade.dart';
 import 'package:cine_stream/data/services/tts/openai_tts_impl.dart';
+import 'package:cine_stream/data/services/tts/edge_tts_impl.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,7 @@ void main() {
           prefs: prefs,
           nativeTts: nativeTts,
           openAiTts: OpenAiTtsImpl(prefs: prefs, nativeFallback: nativeTts),
+          edgeTts: EdgeTtsImpl(prefs: prefs),
         ),
       );
     }

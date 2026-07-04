@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:cine_stream/domain/services/tts_service.dart';
 import 'package:cine_stream/data/services/tts/native_tts_impl.dart';
 import 'package:cine_stream/data/services/tts/openai_tts_impl.dart';
+import 'package:cine_stream/data/services/tts/edge_tts_impl.dart';
 import 'package:cine_stream/data/services/tts/tts_service_facade.dart';
 import 'package:cine_stream/data/services/log_service.dart';
 import 'package:cine_stream/di/injection.dart';
@@ -211,6 +212,7 @@ void main() {
         prefs: prefs,
         nativeTts: nativeImpl,
         openAiTts: OpenAiTtsImpl(dio: MockDio(), player: MockAudioPlayer(), prefs: prefs, nativeFallback: nativeImpl),
+        edgeTts: EdgeTtsImpl(dio: MockDio(), player: MockAudioPlayer(), prefs: prefs),
       );
 
       await facade.init();
@@ -335,7 +337,13 @@ void main() {
 
       final nativeImpl = NativeTtsImpl(tts: mockTts);
       final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
-      final facade = TtsServiceFacade(prefs: prefs, nativeTts: nativeImpl, openAiTts: openAiImpl);
+      final edgeTts = EdgeTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs);
+      final facade = TtsServiceFacade(
+        prefs: prefs,
+        nativeTts: nativeImpl,
+        openAiTts: openAiImpl,
+        edgeTts: edgeTts,
+      );
 
       // Trường hợp 1: tts_engine = native
       await prefs.setString('tts_engine', 'native');
@@ -360,7 +368,13 @@ void main() {
 
       final nativeImpl = NativeTtsImpl(tts: mockTts);
       final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
-      final facade = TtsServiceFacade(prefs: prefs, nativeTts: nativeImpl, openAiTts: openAiImpl);
+      final edgeTts = EdgeTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs);
+      final facade = TtsServiceFacade(
+        prefs: prefs,
+        nativeTts: nativeImpl,
+        openAiTts: openAiImpl,
+        edgeTts: edgeTts,
+      );
 
       await prefs.setString('tts_engine', 'openai');
       await prefs.setString('tts_api_key', ''); // Rỗng API key

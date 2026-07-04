@@ -45,6 +45,9 @@ class MockTtsService implements TtsService {
   }
 
   @override
+  Future<void> setVolume(double volume) async {}
+
+  @override
   Future<List<String>> getVoices() async {
     return ['Voice 1', 'Voice 2'];
   }

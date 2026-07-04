@@ -189,8 +189,12 @@ class OpenAiTtsImpl implements TtsService {
   @override
   Future<void> dispose() async {
     _isDisposed = true;
-    await stop();
-    await _player.dispose();
+    try {
+      await stop();
+    } catch (_) {}
+    try {
+      await _player.dispose();
+    } catch (_) {}
   }
 
   @override
