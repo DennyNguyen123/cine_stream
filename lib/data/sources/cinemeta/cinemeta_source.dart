@@ -12,6 +12,7 @@ import 'extractors/vdrk_subtitle_extractor.dart';
 import 'extractors/vidsrcme_extractor.dart';
 import '../../../domain/entities/subtitle.dart';
 import '../../../core/utils/stream_info_cache.dart';
+import '../../../core/errors/stream_extraction_exception.dart';
 
 class CinemetaSource implements MovieSource {
   final Dio _dio;
@@ -349,6 +350,9 @@ class CinemetaSource implements MovieSource {
       return null;
     } catch (e) {
       print('Cinemeta getStreamInfo Error: $e');
+      if (e is StreamExtractionException) {
+        rethrow;
+      }
       return null;
     }
   }

@@ -27,6 +27,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/repositories/source_manager.dart';
 import '../../data/services/log_service.dart';
 import '../../core/utils/stream_info_cache.dart';
+import '../../core/errors/stream_extraction_exception.dart';
+import 'webview_extractor_screen.dart';
 import '../widgets/debug_overlay.dart';
 
 import '../../domain/services/tts_service.dart';
@@ -618,11 +620,23 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
     try {
       final source = getIt<MovieSource>();
-      final streamInfo = await source.getStreamInfo(
-        widget.movieId, 
-        nextEp.id, 
-        serverId: widget.serverId,
-      );
+      StreamInfo? streamInfo;
+      try {
+        streamInfo = await source.getStreamInfo(
+          widget.movieId, 
+          nextEp.id, 
+          serverId: widget.serverId,
+        );
+      } on StreamExtractionException catch (ex) {
+        streamInfo = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => WebViewExtractorScreen(
+            embedUrl: ex.embedUrl,
+            serverId: ex.serverId,
+            subtitles: ex.subtitles,
+          )),
+        );
+      }
       
       if (!mounted) return;
       
@@ -639,7 +653,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => PlayerScreen(
-            streamInfo: streamInfo, 
+            streamInfo: streamInfo!, 
             title: title,
             movieId: widget.movieId,
             movieTitle: widget.movieTitle,
@@ -674,7 +688,19 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
     try {
       final source = getIt<MovieSource>();
-      final streamInfo = await source.getStreamInfo(widget.movieId, widget.episodeId, serverId: serverId);
+      StreamInfo? streamInfo;
+      try {
+        streamInfo = await source.getStreamInfo(widget.movieId, widget.episodeId, serverId: serverId);
+      } on StreamExtractionException catch (ex) {
+        streamInfo = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => WebViewExtractorScreen(
+            embedUrl: ex.embedUrl,
+            serverId: ex.serverId,
+            subtitles: ex.subtitles,
+          )),
+        );
+      }
       
       if (!mounted) return;
       
@@ -682,7 +708,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => PlayerScreen(
-            streamInfo: streamInfo, 
+            streamInfo: streamInfo!, 
             title: widget.title,
             movieId: widget.movieId,
             movieTitle: widget.movieTitle,

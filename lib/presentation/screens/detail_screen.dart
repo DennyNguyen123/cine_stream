@@ -5,6 +5,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/movie.dart';
 import '../../domain/entities/movie_detail.dart';
 import '../../domain/entities/episode.dart';
+import '../../core/utils/stream_info_cache.dart';
+import '../../core/errors/stream_extraction_exception.dart';
+import 'webview_extractor_screen.dart';
 import '../../domain/entities/stream_info.dart';
 import '../../domain/entities/history_item.dart';
 import '../../data/repositories/history_repository.dart';
@@ -950,11 +953,26 @@ class _DetailScreenState extends State<DetailScreen> {
 
     try {
       final source = getIt<MovieSource>();
-      final streamInfo = await source.getStreamInfo(
-        movieId,
-        episodeId,
-        serverId: serverId,
-      );
+      StreamInfo? streamInfo;
+      
+      try {
+        streamInfo = await source.getStreamInfo(
+          movieId,
+          episodeId,
+          serverId: serverId,
+        );
+      } on StreamExtractionException catch (ex) {
+        streamInfo = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => WebViewExtractorScreen(
+              embedUrl: ex.embedUrl,
+              serverId: ex.serverId,
+              subtitles: ex.subtitles,
+            ),
+          ),
+        );
+      }
 
       if (!context.mounted) return;
 
@@ -964,7 +982,7 @@ class _DetailScreenState extends State<DetailScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => PlayerScreen(
-              streamInfo: streamInfo,
+              streamInfo: streamInfo!,
               title: title,
               movieId: movieId,
               movieTitle: widget.movie.title,

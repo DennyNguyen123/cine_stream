@@ -7,6 +7,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../../../../domain/entities/stream_info.dart';
 import '../../../../domain/entities/subtitle.dart';
+import '../../../../core/errors/stream_extraction_exception.dart';
 
 class VidnestExtractor {
   static Future<StreamInfo?> extractStream(String serverUrl, List<SubtitleTrack> subtitles) async {
@@ -19,13 +20,27 @@ class VidnestExtractor {
     final completer = Completer<StreamInfo?>();
     String? foundStreamUrl;
 
-    // Global timeout of 60 seconds
-    final timeoutTimer = Timer(const Duration(seconds: 60), () {
+    // Timeout of 15 seconds for headless extraction
+    final timeoutTimer = Timer(const Duration(seconds: 15), () {
       if (!completer.isCompleted) {
         if (foundStreamUrl != null) {
           completer.complete(StreamInfo(videoUrl: foundStreamUrl!, subtitles: subtitles));
         } else {
-          completer.completeError(Exception('Timeout: no stream found after 30s'));
+          final uri = Uri.parse(serverUrl);
+          final isTv = uri.path.contains('-tv');
+          final id = uri.queryParameters['tmdb'] ?? uri.queryParameters['imdb'];
+          final s = uri.queryParameters['s'];
+          final e = uri.queryParameters['e'];
+          final directUrl = isTv 
+              ? 'https://vidnest.fun/tv/$id/$s/$e?autostart=true'
+              : 'https://vidnest.fun/movie/$id?autostart=true';
+              
+          completer.completeError(StreamExtractionException(
+            embedUrl: directUrl,
+            serverId: 'vnest',
+            subtitles: subtitles,
+            message: 'Timeout: no stream found after 15s',
+          ));
         }
       }
     });
@@ -173,8 +188,8 @@ class VidnestExtractor {
                   if(v.src) console.log('VIDEO_SRC:' + v.src);
                   if(v.currentSrc) console.log('VIDEO_CURRENT_SRC:' + v.currentSrc);
                 });
-              }, 1000);
-              setTimeout(() => clearInterval(clickInterval), 15000);
+              }, 1500);
+              setTimeout(() => clearInterval(clickInterval), 14000);
           ''',
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
           forMainFrameOnly: false,
@@ -207,8 +222,8 @@ class VidnestExtractor {
           var clickIntervalMain = setInterval(function() {
             document.querySelectorAll('[class*="play"], [id*="play"], button, .btn').forEach(function(b) { try { b.click(); } catch(e) {} });
             document.querySelectorAll('video').forEach(function(v) { try { v.play(); } catch(e) {} });
-          }, 1000);
-          setTimeout(() => clearInterval(clickIntervalMain), 15000);
+          }, 1500);
+          setTimeout(() => clearInterval(clickIntervalMain), 14000);
         ''');
       },
       onCreateWindow: (controller, createWindowAction) async {
@@ -313,7 +328,6 @@ class VidnestExtractor {
         if (msg.startsWith('"') && msg.endsWith('"')) {
           msg = msg.substring(1, msg.length - 1);
         }
-        print('[VidnestExtractor Console] $msg');
         if (msg.startsWith('IFRAME_FOUND:')) {
           final iframeSrc = msg.substring('IFRAME_FOUND:'.length);
           print('[VidnestExtractor] ➡ Redirecting via Console to: $iframeSrc');
@@ -385,7 +399,26 @@ class VidnestExtractor {
       print('[VidnestExtractor] Error: $e');
       timeoutTimer.cancel();
       await headlessWebView.dispose();
-      return null;
+      
+      if (e is StreamExtractionException) {
+        throw e;
+      }
+      
+      final uri = Uri.parse(serverUrl);
+      final isTv = uri.path.contains('-tv');
+      final id = uri.queryParameters['tmdb'] ?? uri.queryParameters['imdb'];
+      final s = uri.queryParameters['s'];
+      final eParam = uri.queryParameters['e'];
+      final directUrl = isTv 
+          ? 'https://vidnest.fun/tv/$id/$s/$eParam?autostart=true'
+          : 'https://vidnest.fun/movie/$id?autostart=true';
+
+      throw StreamExtractionException(
+        embedUrl: directUrl,
+        serverId: 'vnest',
+        subtitles: subtitles,
+        message: e.toString(),
+      );
     }
   }
 

@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../../domain/entities/stream_info.dart';
 import '../../../../domain/entities/subtitle.dart';
+import '../../../../core/errors/stream_extraction_exception.dart';
 
 class VidsrcmeExtractor {
   static Future<StreamInfo?> extractStream(String serverUrl, List<SubtitleTrack> subtitles) async {
@@ -14,13 +15,18 @@ class VidsrcmeExtractor {
     final completer = Completer<StreamInfo?>();
     String? foundStreamUrl;
 
-    // Global timeout of 60 seconds
-    final timeoutTimer = Timer(const Duration(seconds: 60), () {
+    // Timeout of 15 seconds for headless extraction
+    final timeoutTimer = Timer(const Duration(seconds: 15), () {
       if (!completer.isCompleted) {
         if (foundStreamUrl != null) {
           completer.complete(StreamInfo(videoUrl: foundStreamUrl!, subtitles: subtitles));
         } else {
-          completer.completeError(Exception('Timeout: no stream found after 60s'));
+          completer.completeError(StreamExtractionException(
+            embedUrl: serverUrl,
+            serverId: 'vidsrcme',
+            subtitles: subtitles,
+            message: 'Timeout: no stream found after 15s',
+          ));
         }
       }
     });
@@ -171,8 +177,8 @@ class VidsrcmeExtractor {
                 if (centerEl) { simulateInteraction(centerEl); }
 
                 document.querySelectorAll('video').forEach(function(v) { try { v.play(); } catch(e) {} });
-              }, 1000);
-              setTimeout(() => clearInterval(clickInterval), 15000);
+              }, 1500);
+              setTimeout(() => clearInterval(clickInterval), 14000);
             }
           ''',
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START, // Inject sớm nhất có thể
@@ -249,7 +255,17 @@ class VidsrcmeExtractor {
       print('[VidsrcmeExtractor] Error: $e');
       timeoutTimer.cancel();
       await headlessWebView.dispose();
-      return null;
+      
+      if (e is StreamExtractionException) {
+        throw e;
+      }
+      
+      throw StreamExtractionException(
+        embedUrl: serverUrl,
+        serverId: 'vidsrcme',
+        subtitles: subtitles,
+        message: e.toString(),
+      );
     }
   }
 
