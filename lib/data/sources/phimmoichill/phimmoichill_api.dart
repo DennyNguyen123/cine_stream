@@ -8,10 +8,73 @@ import 'phimmoichill_models.dart';
 
 class PhimMoiChillApi {
   final Dio _dio;
-  final String _baseUrl = 'https://phimmoi.cc';
-  final String _apiUrl = 'https://cdn.phimmoi.cc/api/v1';
+  String? _resolvedBaseUrl;
+  String? _resolvedApiUrl;
+
+  String get resolvedBaseUrl => _resolvedBaseUrl ?? 'https://phimmoi.date';
 
   PhimMoiChillApi(this._dio);
+
+  Future<void> _ensureInitialized() async {
+    if (_resolvedBaseUrl != null) return;
+    try {
+      final response = await _dio.get(
+        'https://phimmoichill.live/',
+        options: Options(
+          headers: {
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        ),
+      );
+
+      String targetUrl = '';
+      final realUri = response.realUri;
+      if (realUri.host != 'phimmoichill.live' && realUri.host.isNotEmpty) {
+        targetUrl = '${realUri.scheme}://${realUri.host}';
+      } else {
+        final html = response.data.toString();
+        final canonicalRegex = RegExp(r'<link[^>]*rel="canonical"[^>]*href="([^"]+)"');
+        final canonicalMatch = canonicalRegex.firstMatch(html);
+        if (canonicalMatch != null) {
+          targetUrl = canonicalMatch.group(1) ?? '';
+        }
+
+        if (targetUrl.isEmpty) {
+          final ogUrlRegex = RegExp(r'<meta[^>]*property="og:url"[^>]*content="([^"]+)"');
+          final ogUrlMatch = ogUrlRegex.firstMatch(html);
+          if (ogUrlMatch != null) {
+            targetUrl = ogUrlMatch.group(1) ?? '';
+          }
+        }
+
+        if (targetUrl.isEmpty) {
+          final cdnRegex = RegExp(r'https://cdn\.([^/"]+)');
+          final cdnMatch = cdnRegex.firstMatch(html);
+          if (cdnMatch != null) {
+            targetUrl = 'https://${cdnMatch.group(1)}';
+          }
+        }
+      }
+
+      if (targetUrl.isNotEmpty) {
+        if (targetUrl.endsWith('/')) {
+          targetUrl = targetUrl.substring(0, targetUrl.length - 1);
+        }
+        final uri = Uri.parse(targetUrl);
+        final host = uri.host;
+        _resolvedBaseUrl = 'https://$host';
+        _resolvedApiUrl = 'https://cdn.$host/api/v1';
+        debugPrint('PhimMoiChillApi: Resolved baseUrl=$_resolvedBaseUrl, apiUrl=$_resolvedApiUrl');
+        return;
+      }
+    } catch (e) {
+      debugPrint('PhimMoiChillApi _ensureInitialized Error: $e');
+    }
+
+    _resolvedBaseUrl = 'https://phimmoi.date';
+    _resolvedApiUrl = 'https://cdn.phimmoi.date/api/v1';
+  }
 
   Future<PhimMoiSearchResponse?> searchMovies({
     required String keyword,
@@ -19,8 +82,9 @@ class PhimMoiChillApi {
     int limit = 20,
   }) async {
     try {
+      await _ensureInitialized();
       final res = await _dio.get(
-        '$_apiUrl/search',
+        '$_resolvedApiUrl/search',
         queryParameters: {'keyword': keyword, 'page': page, 'limit': limit},
       );
       return PhimMoiSearchResponse.fromJson(res.data);
@@ -43,6 +107,7 @@ class PhimMoiChillApi {
     int limit = 21,
   }) async {
     try {
+      await _ensureInitialized();
       final queryParams = <String, dynamic>{
         'sort': sort,
         'order': order,
@@ -69,7 +134,7 @@ class PhimMoiChillApi {
       }
 
       final res = await _dio.get(
-        '$_apiUrl/filter/movies',
+        '$_resolvedApiUrl/filter/movies',
         queryParameters: queryParams,
       );
       return PhimMoiSearchResponse.fromJson(res.data);
@@ -81,7 +146,8 @@ class PhimMoiChillApi {
 
   Future<Map<String, dynamic>?> getMovieDetailHTML(String slug) async {
     try {
-      final res = await _dio.get('$_baseUrl/phim/$slug');
+      await _ensureInitialized();
+      final res = await _dio.get('$_resolvedBaseUrl/phim/$slug');
       final html = res.data.toString();
 
       String title = '';
@@ -119,7 +185,7 @@ class PhimMoiChillApi {
       // Fetch Next.js watch page to get episodes & servers
       try {
         final watchRes = await _dio.get(
-          '$_baseUrl/xem-phim/$slug/tap-1/vietsub',
+          '$_resolvedBaseUrl/xem-phim/$slug/tap-1/vietsub',
         );
         final watchHtml = watchRes.data.toString();
 
@@ -209,13 +275,30 @@ class PhimMoiChillApi {
 
   Future<String?> getStreamUrl(String episodePath) async {
     try {
-      debugPrint('PhimMoiChillApi getStreamUrl: episodePath=$episodePath');
-      final res = await _dio.get('$_baseUrl$episodePath');
+      await _ensureInitialized();
+
+      // Đảm bảo episodePath luôn chứa hậu tố ngôn ngữ để tránh lỗi 404 trên domain mới
+      String path = episodePath;
+      if (!path.contains('/vietsub') &&
+          !path.contains('/thuyet-minh') &&
+          !path.contains('/song-ngu')) {
+        final uri = Uri.parse(path);
+        var newPath = uri.path;
+        if (!newPath.endsWith('/vietsub') &&
+            !newPath.endsWith('/thuyet-minh') &&
+            !newPath.endsWith('/song-ngu')) {
+          newPath = '$newPath/vietsub';
+        }
+        path = uri.hasQuery ? '$newPath?${uri.query}' : newPath;
+      }
+
+      debugPrint('PhimMoiChillApi getStreamUrl: episodePath=$path');
+      final res = await _dio.get('$_resolvedBaseUrl$path');
       final html = res.data.toString();
 
       String? serverSlug;
-      if (episodePath.contains('?server=')) {
-        serverSlug = episodePath.split('?server=').last;
+      if (path.contains('?server=')) {
+        serverSlug = path.split('?server=').last;
       }
 
       String? matchedEmbedUrl;
@@ -285,7 +368,7 @@ class PhimMoiChillApi {
 
         final embedRes = await _dio.get(
           realUrl,
-          options: Options(headers: {'Referer': '$_baseUrl/'}),
+          options: Options(headers: {'Referer': '$_resolvedBaseUrl/'}),
         );
         final embedHtml = embedRes.data.toString();
         final vDataRegex = RegExp(r'window\.__V_DATA__\s*=\s*"([^"]+)"');
@@ -306,10 +389,10 @@ class PhimMoiChillApi {
           var base64Data = vData.replaceAll('-', '+').replaceAll('_', '/');
           switch (base64Data.length % 4) {
             case 2:
-              base64Data += "==";
+              base64Data += '==';
               break;
             case 3:
-              base64Data += "=";
+              base64Data += '=';
               break;
           }
           final jsonStr = utf8.decode(base64Decode(base64Data));
@@ -324,7 +407,8 @@ class PhimMoiChillApi {
             if (mDecoded.endsWith('.m3u8') && mDecoded.startsWith('http')) {
               return mDecoded;
             } else if (mDecoded.startsWith('/api/v1/media-proxy')) {
-              final proxyUrl = 'https://cdn.phimmoi.cc$mDecoded';
+              final cdnHost = 'cdn.${Uri.parse(_resolvedBaseUrl!).host}';
+              final proxyUrl = 'https://$cdnHost$mDecoded';
               debugPrint(
                 'PhimMoiChillApi getStreamUrl: fetching proxy data from $proxyUrl',
               );

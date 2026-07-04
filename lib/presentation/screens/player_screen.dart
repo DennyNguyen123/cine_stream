@@ -156,9 +156,20 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       
       // Diagnostic test removed to prevent memory leak and OOM crashes
 
-      if (widget.streamInfo.videoUrl.startsWith('http')) {
+      final isHttp = widget.streamInfo.videoUrl.startsWith('http');
+      final isFileUri = widget.streamInfo.videoUrl.startsWith('file:///');
+      final hasHeaders = widget.streamInfo.headers != null;
+
+      if (isHttp || isFileUri || hasHeaders) {
+        Uri videoUri;
+        if (isHttp || isFileUri) {
+          videoUri = Uri.parse(widget.streamInfo.videoUrl);
+        } else {
+          videoUri = Uri.file(widget.streamInfo.videoUrl);
+        }
+
         _controller = VideoPlayerController.networkUrl(
-          Uri.parse(widget.streamInfo.videoUrl),
+          videoUri,
           formatHint: widget.streamInfo.videoUrl.contains('.mp4') ? VideoFormat.other : VideoFormat.hls,
           httpHeaders: widget.streamInfo.headers ?? {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',

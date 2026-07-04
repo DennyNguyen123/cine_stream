@@ -321,6 +321,7 @@ class _SourceButtonState extends State<_SourceButton> {
   }
 
   void _showSourceSelectionDialog(BuildContext context) {
+    final outerContext = context;
     final sourceManager = getIt<SourceManager>();
     final sources = sourceManager.getAvailableSources();
     final FocusNode firstNode = FocusNode();
@@ -389,9 +390,9 @@ class _SourceButtonState extends State<_SourceButton> {
                                       sourceManager.setActiveSource(source['id']!).then((_) {
                                         PaintingBinding.instance.imageCache.clear();
                                         PaintingBinding.instance.imageCache.clearLiveImages();
-                                        if (!context.mounted) return;
-                                        context.read<HomeCubit>().loadData();
-                                        context.read<HistoryCubit>().loadHistory();
+                                        if (!outerContext.mounted) return;
+                                        outerContext.read<HomeCubit>().loadData();
+                                        outerContext.read<HistoryCubit>().loadHistory();
                                       });
                                     }
                                     return KeyEventResult.handled;
@@ -406,9 +407,9 @@ class _SourceButtonState extends State<_SourceButton> {
                                     await sourceManager.setActiveSource(source['id']!);
                                     PaintingBinding.instance.imageCache.clear();
                                     PaintingBinding.instance.imageCache.clearLiveImages();
-                                    if (!context.mounted) return;
-                                    context.read<HomeCubit>().loadData();
-                                    context.read<HistoryCubit>().loadHistory();
+                                    if (!outerContext.mounted) return;
+                                    outerContext.read<HomeCubit>().loadData();
+                                    outerContext.read<HistoryCubit>().loadHistory();
                                   }
                                 },
                                 child: Container(

@@ -14,7 +14,7 @@ import '../data/repositories/subtitle_repository_impl.dart';
 import '../data/repositories/translation_service.dart';
 import '../data/repositories/external_subtitle_repository.dart';
 import '../data/sources/kisskh/kisskh_api.dart';
-import '../data/sources/kisskh/kisskh_source.dart';
+// import '../data/sources/kisskh/kisskh_source.dart';
 import '../data/sources/cinemeta/cinemeta_source.dart';
 import '../data/sources/phimmoichill/phimmoichill_api.dart';
 import '../data/sources/phimmoichill/phimmoichill_source.dart';
@@ -76,7 +76,7 @@ Future<void> setupInjection() async {
   getIt.registerLazySingleton(() => KissKhApi(getIt()));
   getIt.registerLazySingleton(() => PhimMoiChillApi(getIt()));
   
-  final kissKhSource = KissKhSource(getIt());
+  // final kissKhSource = KissKhSource(getIt());
   final cinemetaSource = CinemetaSource(getIt());
   final phimMoiChillSource = PhimMoiChillSource(getIt());
 
@@ -86,7 +86,7 @@ Future<void> setupInjection() async {
     sources: {
       'cinemeta': cinemetaSource,
       'phimmoichill': phimMoiChillSource,
-      'kisskh': kissKhSource,
+      // 'kisskh': kissKhSource,
     },
     defaultSourceId: 'cinemeta',
   );

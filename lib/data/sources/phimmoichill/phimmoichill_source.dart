@@ -279,7 +279,16 @@ class PhimMoiChillSource implements MovieSource {
       final m3u8Url = await _api.getStreamUrl(finalUrl);
       if (m3u8Url == null || m3u8Url.isEmpty) return null;
 
-      return StreamInfo(videoUrl: m3u8Url, subtitles: []);
+      final domain = Uri.parse(_api.resolvedBaseUrl).host;
+      return StreamInfo(
+        videoUrl: m3u8Url,
+        subtitles: const [],
+        headers: {
+          'Referer': 'https://$domain/',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      );
     } catch (e) {
       debugPrint('PhimMoiChillSource getStreamInfo Error: $e');
       rethrow;
