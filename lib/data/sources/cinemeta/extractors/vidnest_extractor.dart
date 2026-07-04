@@ -100,6 +100,7 @@ class VidnestExtractor {
         supportMultipleWindows: true,
         thirdPartyCookiesEnabled: true,
         mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+        loadsImagesAutomatically: false,
       ),
       shouldOverrideUrlLoading: (controller, navigationAction) async {
         final url = navigationAction.request.url?.toString() ?? '';
@@ -240,6 +241,26 @@ class VidnestExtractor {
           return WebResourceResponse(
             data: Uint8List.fromList([]),
             statusCode: 404,
+            reasonPhrase: 'Not Found',
+            headers: {'Access-Control-Allow-Origin': '*'},
+          );
+        }
+
+        final lowercaseUrl = reqUrl.toLowerCase();
+        if (lowercaseUrl.endsWith('.png') ||
+            lowercaseUrl.endsWith('.jpg') ||
+            lowercaseUrl.endsWith('.jpeg') ||
+            lowercaseUrl.endsWith('.webp') ||
+            lowercaseUrl.endsWith('.gif') ||
+            lowercaseUrl.endsWith('.svg') ||
+            lowercaseUrl.endsWith('.ico') ||
+            lowercaseUrl.endsWith('.woff') ||
+            lowercaseUrl.endsWith('.woff2') ||
+            lowercaseUrl.endsWith('.ttf')) {
+          return WebResourceResponse(
+            data: Uint8List.fromList([]),
+            statusCode: 200,
+            reasonPhrase: 'OK',
             headers: {'Access-Control-Allow-Origin': '*'},
           );
         }
@@ -250,6 +271,19 @@ class VidnestExtractor {
             data: Uint8List.fromList([]),
             statusCode: 204,
             reasonPhrase: 'No Content',
+            headers: {'Access-Control-Allow-Origin': '*'},
+          );
+        }
+
+        if (reqUrl.contains('tik.1x2.space') || 
+            reqUrl.contains('nightspeedster.app') || 
+            reqUrl.contains('tiktoks.animanga.fun') || 
+            reqUrl.contains('animanga.fun')) {
+          print('[VidnestExtractor] ⚠ Blocked known tarpit to force fallback: $reqUrl');
+          return WebResourceResponse(
+            data: Uint8List.fromList([]),
+            statusCode: 404,
+            reasonPhrase: 'Not Found',
             headers: {'Access-Control-Allow-Origin': '*'},
           );
         }

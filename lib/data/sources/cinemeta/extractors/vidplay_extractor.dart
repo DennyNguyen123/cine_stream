@@ -97,6 +97,7 @@ class VidplayExtractor {
         transparentBackground: true,
         thirdPartyCookiesEnabled: true,
         mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+        loadsImagesAutomatically: false,
       ),
       shouldOverrideUrlLoading: (controller, navigationAction) async {
         final url = navigationAction.request.url?.toString() ?? '';
@@ -239,6 +240,25 @@ class VidplayExtractor {
           );
         }
 
+        final lowercaseUrl = reqUrl.toLowerCase();
+        if (lowercaseUrl.endsWith('.png') ||
+            lowercaseUrl.endsWith('.jpg') ||
+            lowercaseUrl.endsWith('.jpeg') ||
+            lowercaseUrl.endsWith('.webp') ||
+            lowercaseUrl.endsWith('.gif') ||
+            lowercaseUrl.endsWith('.svg') ||
+            lowercaseUrl.endsWith('.ico') ||
+            lowercaseUrl.endsWith('.woff') ||
+            lowercaseUrl.endsWith('.woff2') ||
+            lowercaseUrl.endsWith('.ttf')) {
+          return WebResourceResponse(
+            data: Uint8List.fromList([]),
+            statusCode: 200,
+            reasonPhrase: 'OK',
+            headers: {'Access-Control-Allow-Origin': '*'},
+          );
+        }
+
         final adPatterns = ['radiance', 'hexoic', 'doubleclick', 'googlesyndication', 'popads', 'adserver', 'popunder'];
         if (adPatterns.any((p) => reqUrl.contains(p))) {
           return WebResourceResponse(
@@ -251,7 +271,10 @@ class VidplayExtractor {
 
         // TIK 2 source blocks Dart/ExoPlayer TLS fingerprint, returning 404.
         // We force the WebView's player to fallback to the next source (VID 2) which works in Dart.
-        if (reqUrl.contains('tik.1x2.space') || reqUrl.contains('nightspeedster.app')) {
+        if (reqUrl.contains('tik.1x2.space') || 
+            reqUrl.contains('nightspeedster.app') || 
+            reqUrl.contains('tiktoks.animanga.fun') || 
+            reqUrl.contains('animanga.fun')) {
           print('[VidplayExtractor] ⚠ Blocked known tarpit to force fallback: $reqUrl');
           return WebResourceResponse(
             data: Uint8List.fromList([]),

@@ -218,7 +218,18 @@ class CinemetaSource implements MovieSource {
   Future<StreamInfo?> getStreamInfo(String movieId, String episodeId, {String? serverId}) async {
     try {
       final cached = StreamInfoCache.getStreamInfo(movieId, episodeId, serverId);
-      if (cached != null) return cached;
+      if (cached != null) {
+        final videoUrl = cached.videoUrl.toLowerCase();
+        if (videoUrl.contains('tiktoks.animanga.fun') ||
+            videoUrl.contains('animanga.fun') ||
+            videoUrl.contains('tik.1x2.space') ||
+            videoUrl.contains('nightspeedster.app')) {
+          print('[Cinemeta] Cached stream info contains blocked domain, clearing cache.');
+          await StreamInfoCache.clearCache(movieId, episodeId, serverId);
+        } else {
+          return cached;
+        }
+      }
 
       final parts = movieId.split('/');
       final type = parts[0];
