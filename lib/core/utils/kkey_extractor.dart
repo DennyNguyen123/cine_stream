@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
 import 'dart:async';
-import 'dart:io';
 import 'dart:collection';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
@@ -122,7 +121,7 @@ class _MobileKkeyExtractor extends KkeyExtractor {
       return result;
     } catch (e) {
       debugPrint('MobileKkeyExtractor Error: $e');
-      await headlessWebView?.dispose();
+      await headlessWebView.dispose();
       return null;
     }
   }

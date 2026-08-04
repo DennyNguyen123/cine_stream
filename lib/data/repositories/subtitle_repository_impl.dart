@@ -27,7 +27,8 @@ class SubtitleRepositoryImpl implements SubtitleRepository {
       }
 
       final headers = <String, dynamic>{
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': '*/*',
       };
 
@@ -37,12 +38,9 @@ class SubtitleRepositoryImpl implements SubtitleRepository {
 
       final response = await _dio.get(
         url,
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: headers,
-        )
+        options: Options(responseType: ResponseType.plain, headers: headers),
       );
-      
+
       final content = response.data?.toString();
       if (content != null && content.isNotEmpty) {
         await cacheFile.writeAsString(content);

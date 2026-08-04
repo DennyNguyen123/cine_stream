@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:video_player/video_player.dart';
 import 'package:cine_stream/di/injection.dart';
 import 'package:cine_stream/domain/services/tts_service.dart';
 import 'package:cine_stream/data/services/log_service.dart';
@@ -87,7 +85,9 @@ void main() {
     }
 
     // Mock Method Channel cho video_player
-    const MethodChannel('flutter.io/videoPlayer').setMockMethodCallHandler((methodCall) async {
+    const MethodChannel('flutter.io/videoPlayer').setMockMethodCallHandler((
+      methodCall,
+    ) async {
       if (methodCall.method == 'init') {
         return null;
       }
@@ -103,24 +103,28 @@ void main() {
   });
 
   group('PlayerScreen TTS Integration Tests', () {
-    testWidgets('1. (ULTIMATE TEST 2) Warm-up & lifecycle hooks', (WidgetTester tester) async {
+    testWidgets('1. (ULTIMATE TEST 2) Warm-up & lifecycle hooks', (
+      WidgetTester tester,
+    ) async {
       final streamInfo = StreamInfo(
         videoUrl: '', // Sử dụng chuỗi rỗng để kích hoạt nhánh mock controller
         headers: {},
       );
 
       // Render PlayerScreen
-      await tester.pumpWidget(MaterialApp(
-        home: PlayerScreen(
-          streamInfo: streamInfo,
-          title: 'Test Movie',
-          movieId: 'id-123',
-          movieTitle: 'Test Movie',
-          episodeId: 'ep-1',
-          episodeNumber: 1.0,
-          allEpisodes: const [],
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PlayerScreen(
+            streamInfo: streamInfo,
+            title: 'Test Movie',
+            movieId: 'id-123',
+            movieTitle: 'Test Movie',
+            episodeId: 'ep-1',
+            episodeNumber: 1.0,
+            allEpisodes: const [],
+          ),
         ),
-      ));
+      );
 
       // 1. Kiểm tra init() TTS đã được gọi trong initState
       expect(mockTts.initCallCount, equals(1));

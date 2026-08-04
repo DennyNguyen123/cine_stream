@@ -57,95 +57,147 @@ class SearchCubit extends Cubit<SearchState> {
       for (var field in _filterConfig!.fields) {
         _currentFilters[field.key] = field.defaultValue;
       }
-      
+
       _currentPage = 1;
-      _currentMovies = await _sourceManager.activeSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
-      _hasReachedMax = _currentMovies.isEmpty;
-      
-      emit(SearchLoaded(
-        filterConfig: _filterConfig!,
-        currentFilters: Map.from(_currentFilters),
-        movies: _currentMovies,
+      _currentMovies = await _sourceManager.activeSource.advancedSearch(
+        _currentFilters,
+        page: _currentPage,
         query: _currentQuery,
-        hasReachedMax: _hasReachedMax,
-      ));
+      );
+      _hasReachedMax = _currentMovies.isEmpty;
+
+      emit(
+        SearchLoaded(
+          filterConfig: _filterConfig!,
+          currentFilters: Map.from(_currentFilters),
+          movies: _currentMovies,
+          query: _currentQuery,
+          hasReachedMax: _hasReachedMax,
+        ),
+      );
     } catch (e) {
-      emit(SearchError('Failed to initialize search: $e', currentFilters: _currentFilters, filterConfig: _filterConfig));
+      emit(
+        SearchError(
+          'Failed to initialize search: $e',
+          currentFilters: _currentFilters,
+          filterConfig: _filterConfig,
+        ),
+      );
     }
   }
 
   Future<void> updateFilter(String key, dynamic value) async {
     if (_filterConfig == null) return;
-    
+
     _currentFilters[key] = value;
     _currentPage = 1;
     _hasReachedMax = false;
-    
-    emit(SearchLoading(filterConfig: _filterConfig, currentFilters: _currentFilters));
-    
+
+    emit(
+      SearchLoading(
+        filterConfig: _filterConfig,
+        currentFilters: _currentFilters,
+      ),
+    );
+
     try {
-      _currentMovies = await _sourceManager.activeSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
-      _hasReachedMax = _currentMovies.isEmpty;
-      
-      emit(SearchLoaded(
-        filterConfig: _filterConfig!,
-        currentFilters: Map.from(_currentFilters),
-        movies: _currentMovies,
+      _currentMovies = await _sourceManager.activeSource.advancedSearch(
+        _currentFilters,
+        page: _currentPage,
         query: _currentQuery,
-        hasReachedMax: _hasReachedMax,
-      ));
+      );
+      _hasReachedMax = _currentMovies.isEmpty;
+
+      emit(
+        SearchLoaded(
+          filterConfig: _filterConfig!,
+          currentFilters: Map.from(_currentFilters),
+          movies: _currentMovies,
+          query: _currentQuery,
+          hasReachedMax: _hasReachedMax,
+        ),
+      );
     } catch (e) {
-      emit(SearchError('Failed to search: $e', currentFilters: _currentFilters, filterConfig: _filterConfig));
+      emit(
+        SearchError(
+          'Failed to search: $e',
+          currentFilters: _currentFilters,
+          filterConfig: _filterConfig,
+        ),
+      );
     }
   }
 
   Future<void> updateQuery(String query) async {
     if (_filterConfig == null) return;
-    
+
     _currentQuery = query;
     _currentPage = 1;
     _hasReachedMax = false;
-    
-    emit(SearchLoading(filterConfig: _filterConfig, currentFilters: _currentFilters));
-    
+
+    emit(
+      SearchLoading(
+        filterConfig: _filterConfig,
+        currentFilters: _currentFilters,
+      ),
+    );
+
     try {
-      _currentMovies = await _sourceManager.activeSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
-      _hasReachedMax = _currentMovies.isEmpty;
-      
-      emit(SearchLoaded(
-        filterConfig: _filterConfig!,
-        currentFilters: Map.from(_currentFilters),
-        movies: _currentMovies,
+      _currentMovies = await _sourceManager.activeSource.advancedSearch(
+        _currentFilters,
+        page: _currentPage,
         query: _currentQuery,
-        hasReachedMax: _hasReachedMax,
-      ));
+      );
+      _hasReachedMax = _currentMovies.isEmpty;
+
+      emit(
+        SearchLoaded(
+          filterConfig: _filterConfig!,
+          currentFilters: Map.from(_currentFilters),
+          movies: _currentMovies,
+          query: _currentQuery,
+          hasReachedMax: _hasReachedMax,
+        ),
+      );
     } catch (e) {
-      emit(SearchError('Failed to search: $e', currentFilters: _currentFilters, filterConfig: _filterConfig));
+      emit(
+        SearchError(
+          'Failed to search: $e',
+          currentFilters: _currentFilters,
+          filterConfig: _filterConfig,
+        ),
+      );
     }
   }
 
   Future<void> loadMore() async {
     if (_filterConfig == null || _isFetchingMore || _hasReachedMax) return;
-    
+
     _isFetchingMore = true;
     _currentPage++;
-    
+
     try {
-      final newMovies = await _sourceManager.activeSource.advancedSearch(_currentFilters, page: _currentPage, query: _currentQuery);
-      
+      final newMovies = await _sourceManager.activeSource.advancedSearch(
+        _currentFilters,
+        page: _currentPage,
+        query: _currentQuery,
+      );
+
       if (newMovies.isEmpty) {
         _hasReachedMax = true;
       } else {
         _currentMovies.addAll(newMovies);
       }
-      
-      emit(SearchLoaded(
-        filterConfig: _filterConfig!,
-        currentFilters: Map.from(_currentFilters),
-        movies: _currentMovies,
-        query: _currentQuery,
-        hasReachedMax: _hasReachedMax,
-      ));
+
+      emit(
+        SearchLoaded(
+          filterConfig: _filterConfig!,
+          currentFilters: Map.from(_currentFilters),
+          movies: _currentMovies,
+          query: _currentQuery,
+          hasReachedMax: _hasReachedMax,
+        ),
+      );
     } catch (e) {
       // Don't emit error on pagination failure to avoid breaking current view, just reset flag
       _currentPage--;

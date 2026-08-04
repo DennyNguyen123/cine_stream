@@ -61,7 +61,8 @@ class HistoryItem {
 
   String toJson() => json.encode(toMap());
 
-  factory HistoryItem.fromJson(String source) => HistoryItem.fromMap(json.decode(source));
+  factory HistoryItem.fromJson(String source) =>
+      HistoryItem.fromMap(json.decode(source));
 
   HistoryItem copyWith({
     String? movieId,

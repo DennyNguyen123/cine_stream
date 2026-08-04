@@ -45,15 +45,22 @@ class HistoryRepositoryImpl implements HistoryRepository {
   @override
   Future<void> saveHistory(HistoryItem item, {bool syncWebDav = true}) async {
     final list = await _getRawHistory();
-    
+
     // Remove if already exists for this movie and source
-    list.removeWhere((e) => e.movieId == item.movieId && e.sourceId == item.sourceId);
-    
-    final newItem = item.isDeleted ? item.copyWith(isDeleted: false, timestamp: DateTime.now().millisecondsSinceEpoch) : item;
-    
+    list.removeWhere(
+      (e) => e.movieId == item.movieId && e.sourceId == item.sourceId,
+    );
+
+    final newItem = item.isDeleted
+        ? item.copyWith(
+            isDeleted: false,
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+          )
+        : item;
+
     // Add new at the beginning
     list.insert(0, newItem);
-    
+
     // Keep max 200 items (to allow space for tombstones)
     if (list.length > 200) {
       list.removeLast();
@@ -61,7 +68,7 @@ class HistoryRepositoryImpl implements HistoryRepository {
 
     final encoded = json.encode(list.map((e) => e.toMap()).toList());
     await _prefs.setString(_historyKey, encoded);
-    
+
     // Background sync
     if (syncWebDav && _webdav.isConfigured) {
       _syncToWebDavBackground();
@@ -71,29 +78,34 @@ class HistoryRepositoryImpl implements HistoryRepository {
   @override
   Future<void> removeHistory(String movieId, String sourceId) async {
     final list = await _getRawHistory();
-    final index = list.indexWhere((e) => e.movieId == movieId && e.sourceId == sourceId);
+    final index = list.indexWhere(
+      (e) => e.movieId == movieId && e.sourceId == sourceId,
+    );
     final now = DateTime.now().millisecondsSinceEpoch;
 
     if (index != -1) {
       list[index] = list[index].copyWith(isDeleted: true, timestamp: now);
     } else {
-      list.insert(0, HistoryItem(
-        movieId: movieId,
-        movieTitle: '',
-        episodeId: '',
-        episodeNumber: 0,
-        positionMs: 0,
-        durationMs: 0,
-        timestamp: now,
-        sourceId: sourceId,
-        isDeleted: true,
-      ));
+      list.insert(
+        0,
+        HistoryItem(
+          movieId: movieId,
+          movieTitle: '',
+          episodeId: '',
+          episodeNumber: 0,
+          positionMs: 0,
+          durationMs: 0,
+          timestamp: now,
+          sourceId: sourceId,
+          isDeleted: true,
+        ),
+      );
     }
-    
+
     if (list.length > 200) {
       list.removeLast();
     }
-    
+
     final encoded = json.encode(list.map((e) => e.toMap()).toList());
     await _prefs.setString(_historyKey, encoded);
 
@@ -107,7 +119,9 @@ class HistoryRepositoryImpl implements HistoryRepository {
   Future<void> clearHistory() async {
     final list = await _getRawHistory();
     final now = DateTime.now().millisecondsSinceEpoch;
-    final clearedList = list.map((e) => e.copyWith(isDeleted: true, timestamp: now)).toList();
+    final clearedList = list
+        .map((e) => e.copyWith(isDeleted: true, timestamp: now))
+        .toList();
 
     final encoded = json.encode(clearedList.map((e) => e.toMap()).toList());
     await _prefs.setString(_historyKey, encoded);
@@ -119,15 +133,20 @@ class HistoryRepositoryImpl implements HistoryRepository {
   }
 
   @override
-  Future<HistoryItem?> getHistoryForMovie(String movieId, String sourceId) async {
+  Future<HistoryItem?> getHistoryForMovie(
+    String movieId,
+    String sourceId,
+  ) async {
     final list = await getHistory();
     try {
-      return list.firstWhere((e) => e.movieId == movieId && e.sourceId == sourceId);
+      return list.firstWhere(
+        (e) => e.movieId == movieId && e.sourceId == sourceId,
+      );
     } catch (e) {
       return null;
     }
   }
-  
+
   void _syncToWebDavBackground() async {
     if (_isSyncing) return;
     _isSyncing = true;
@@ -150,16 +169,18 @@ class HistoryRepositoryImpl implements HistoryRepository {
       final remoteData = await _webdav.getHistory();
       if (remoteData != null && remoteData['history'] != null) {
         final remoteListRaw = List<dynamic>.from(remoteData['history']);
-        final remoteList = remoteListRaw.map((e) => HistoryItem.fromMap(e)).toList();
-        
+        final remoteList = remoteListRaw
+            .map((e) => HistoryItem.fromMap(e))
+            .toList();
+
         final localList = await _getRawHistory();
         final Map<String, HistoryItem> mergedMap = {};
-        
+
         // Add all local
         for (var item in localList) {
           mergedMap['${item.sourceId}_${item.movieId}'] = item;
         }
-        
+
         // Merge with remote
         for (var item in remoteList) {
           final key = '${item.sourceId}_${item.movieId}';
@@ -172,17 +193,17 @@ class HistoryRepositoryImpl implements HistoryRepository {
             mergedMap[key] = item;
           }
         }
-        
+
         final mergedList = mergedMap.values.toList();
         mergedList.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-        
+
         if (mergedList.length > 200) {
           mergedList.removeRange(200, mergedList.length);
         }
-        
+
         final encoded = json.encode(mergedList.map((e) => e.toMap()).toList());
         await _prefs.setString(_historyKey, encoded);
-        
+
         // Update WebDAV with merged list directly without trigger another sync background function since we're in one
         final mapData = {'history': mergedList.map((e) => e.toMap()).toList()};
         await _webdav.saveHistory(mapData);

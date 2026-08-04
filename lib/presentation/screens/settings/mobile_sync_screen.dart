@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../di/injection.dart';
 
 class MobileSyncScreen extends StatefulWidget {
-  const MobileSyncScreen({Key? key}) : super(key: key);
+  const MobileSyncScreen({super.key});
 
   @override
   _MobileSyncScreenState createState() => _MobileSyncScreenState();
@@ -23,7 +23,9 @@ class _MobileSyncScreenState extends State<MobileSyncScreen> {
     for (final barcode in barcodes) {
       if (barcode.rawValue != null && barcode.rawValue!.startsWith('http')) {
         HapticFeedback.lightImpact();
-        setState(() { _scannedUrl = barcode.rawValue; });
+        setState(() {
+          _scannedUrl = barcode.rawValue;
+        });
         _sendConfig();
         break;
       }
@@ -32,53 +34,62 @@ class _MobileSyncScreenState extends State<MobileSyncScreen> {
 
   void _sendConfig() async {
     setState(() => _isLoading = true);
-    
+
     final prefs = getIt<SharedPreferences>();
     final payload = jsonEncode({
-      "url": prefs.getString('cinestream_webdav_url') ?? "", 
-      "user": prefs.getString('cinestream_webdav_user') ?? "", 
-      "pass": prefs.getString('cinestream_webdav_pass') ?? "",
-      "path": prefs.getString('cinestream_webdav_path') ?? "/CineStream",
-      "tts_engine": prefs.getString('tts_engine') ?? "native",
-      "tts_base_url": prefs.getString('tts_base_url') ?? "",
-      "tts_api_key": prefs.getString('tts_api_key') ?? "",
-      "tts_model": prefs.getString('tts_model') ?? "tts-1",
-      "tts_voice": prefs.getString('tts_voice') ?? "alloy",
-    }); 
-    
+      'url': prefs.getString('cinestream_webdav_url') ?? '',
+      'user': prefs.getString('cinestream_webdav_user') ?? '',
+      'pass': prefs.getString('cinestream_webdav_pass') ?? '',
+      'path': prefs.getString('cinestream_webdav_path') ?? '/CineStream',
+      'tts_engine': prefs.getString('tts_engine') ?? 'native',
+      'tts_base_url': prefs.getString('tts_base_url') ?? '',
+      'tts_api_key': prefs.getString('tts_api_key') ?? '',
+      'tts_model': prefs.getString('tts_model') ?? 'tts-1',
+      'tts_voice': prefs.getString('tts_voice') ?? 'alloy',
+    });
+
     try {
       final response = await http.post(
-        Uri.parse(_scannedUrl!), 
+        Uri.parse(_scannedUrl!),
         body: payload,
-        headers: {'Content-Type': 'application/json'}
+        headers: {'Content-Type': 'application/json'},
       );
-      
+
       if (response.statusCode == 200) {
         HapticFeedback.heavyImpact();
         if (mounted) {
           Navigator.pop(context); // close scanner
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Sync Successful!'), backgroundColor: Colors.green)
+            const SnackBar(
+              content: Text('Sync Successful!'),
+              backgroundColor: Colors.green,
+            ),
           );
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('An error occurred, please try again'), backgroundColor: Colors.red)
+            const SnackBar(
+              content: Text('An error occurred, please try again'),
+              backgroundColor: Colors.red,
+            ),
           );
-          setState(() { 
-            _isLoading = false; 
+          setState(() {
+            _isLoading = false;
             _scannedUrl = null; // Reset để quét lại
           });
         }
       }
-    } catch(e) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot connect to TV'), backgroundColor: Colors.red)
+          const SnackBar(
+            content: Text('Cannot connect to TV'),
+            backgroundColor: Colors.red,
+          ),
         );
-        setState(() { 
-          _isLoading = false; 
+        setState(() {
+          _isLoading = false;
           _scannedUrl = null; // Reset để quét lại
         });
       }
@@ -90,15 +101,13 @@ class _MobileSyncScreenState extends State<MobileSyncScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("Scan TV QR Code"),
+        title: const Text('Scan TV QR Code'),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Stack(
         children: [
-          MobileScanner(
-            onDetect: _onDetect,
-          ),
+          MobileScanner(onDetect: _onDetect),
           // Viewfinder Overlay
           ColorFiltered(
             colorFilter: ColorFilter.mode(
@@ -119,7 +128,8 @@ class _MobileSyncScreenState extends State<MobileSyncScreen> {
                     width: 250,
                     height: 250,
                     decoration: BoxDecoration(
-                      color: Colors.red, // This color doesn't matter because of BlendMode.srcOut
+                      color: Colors
+                          .red, // This color doesn't matter because of BlendMode.srcOut
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
@@ -142,11 +152,11 @@ class _MobileSyncScreenState extends State<MobileSyncScreen> {
             left: 0,
             right: 0,
             child: Text(
-              "Place QR Code inside the frame",
+              'Place QR Code inside the frame',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white, fontSize: 16),
             ),
-          )
+          ),
         ],
       ),
     );

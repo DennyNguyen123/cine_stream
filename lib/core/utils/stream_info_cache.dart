@@ -7,11 +7,20 @@ import '../../di/injection.dart';
 class StreamInfoCache {
   static const String _prefix = 'stream_info_cache_';
 
-  static String _generateKey(String movieId, String episodeId, String? serverId) {
+  static String _generateKey(
+    String movieId,
+    String episodeId,
+    String? serverId,
+  ) {
     return '$_prefix${movieId}_${episodeId}_${serverId ?? "default"}';
   }
 
-  static Future<void> saveStreamInfo(String movieId, String episodeId, String? serverId, StreamInfo info) async {
+  static Future<void> saveStreamInfo(
+    String movieId,
+    String episodeId,
+    String? serverId,
+    StreamInfo info,
+  ) async {
     try {
       final prefs = getIt<SharedPreferences>();
       final key = _generateKey(movieId, episodeId, serverId);
@@ -23,12 +32,20 @@ class StreamInfoCache {
     }
   }
 
-  static StreamInfo? getStreamInfo(String movieId, String episodeId, String? serverId) {
+  static StreamInfo? getStreamInfo(
+    String movieId,
+    String episodeId,
+    String? serverId,
+  ) {
     // Tạm bỏ cơ chế lưu cache m3u8
     return null;
   }
 
-  static Future<void> clearCache(String movieId, String episodeId, String? serverId) async {
+  static Future<void> clearCache(
+    String movieId,
+    String episodeId,
+    String? serverId,
+  ) async {
     try {
       final prefs = getIt<SharedPreferences>();
       final key = _generateKey(movieId, episodeId, serverId);

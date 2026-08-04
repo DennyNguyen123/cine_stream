@@ -80,11 +80,12 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Auto Next Toggle
           Focus(
             onKeyEvent: (node, event) {
-              if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+              if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.arrowUp) {
                 _bottomNode.requestFocus();
                 return KeyEventResult.handled;
               }
@@ -103,7 +104,7 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Debug Stats Toggle
           _buildFocusableTile(
             title: 'Debug Stats',
@@ -116,20 +117,35 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Voice-over Target Language
-          const Text('Voice-over Language', style: TextStyle(color: Colors.white70, fontSize: 16)),
+          const Text(
+            'Voice-over Language',
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+          ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _ttsTargetLang,
+            initialValue: _ttsTargetLang,
             dropdownColor: AppColors.surface,
             style: const TextStyle(color: Colors.white, fontSize: 16),
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white12,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white24)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 2,
+                ),
+              ),
             ),
             items: const [
               DropdownMenuItem(value: 'vi', child: Text('Vietnamese (vi)')),
@@ -150,7 +166,10 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Voice-over Delay', style: TextStyle(color: Colors.white70, fontSize: 16)),
+              const Text(
+                'Voice-over Delay',
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+              ),
               Row(
                 children: [
                   _buildDelayButton(Icons.remove, () {
@@ -158,14 +177,21 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                       _ttsDelayMs -= 100;
                       if (_ttsDelayMs < -5000) _ttsDelayMs = -5000;
                     });
-                    getIt<SharedPreferences>().setDouble('tts_delay_ms', _ttsDelayMs);
+                    getIt<SharedPreferences>().setDouble(
+                      'tts_delay_ms',
+                      _ttsDelayMs,
+                    );
                   }),
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 60,
                     child: Text(
-                      '${_ttsDelayMs.toInt()} ms', 
-                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 16),
+                      '${_ttsDelayMs.toInt()} ms',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -175,14 +201,17 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                       _ttsDelayMs += 100;
                       if (_ttsDelayMs > 5000) _ttsDelayMs = 5000;
                     });
-                    getIt<SharedPreferences>().setDouble('tts_delay_ms', _ttsDelayMs);
+                    getIt<SharedPreferences>().setDouble(
+                      'tts_delay_ms',
+                      _ttsDelayMs,
+                    );
                   }),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Voice-over Advanced Settings Button
           _buildFocusableTile(
             title: 'TTS Advanced Settings',
@@ -190,7 +219,7 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
             onTap: widget.onVoiceOverSettings,
           ),
           const SizedBox(height: 16),
-          
+
           // Speed Selection
           const Text(
             'Playback Speed',
@@ -201,7 +230,8 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
             height: 50,
             child: Focus(
               onKeyEvent: (node, event) {
-                if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.arrowDown) {
                   _topNode.requestFocus();
                   return KeyEventResult.handled;
                 }
@@ -215,7 +245,11 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                   final isSelected = s == _speed;
                   return Padding(
                     padding: const EdgeInsets.only(right: 12.0),
-                    child: _buildSpeedItem(s, isSelected, index == 0 ? _bottomNode : null),
+                    child: _buildSpeedItem(
+                      s,
+                      isSelected,
+                      index == 0 ? _bottomNode : null,
+                    ),
                   );
                 },
               ),
@@ -226,7 +260,12 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
     );
   }
 
-  Widget _buildFocusableTile({FocusNode? focusNode, required String title, required String subtitle, required VoidCallback onTap}) {
+  Widget _buildFocusableTile({
+    FocusNode? focusNode,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
     return Builder(
       builder: (context) {
         bool isFocused = false;
@@ -234,10 +273,12 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
           builder: (context, setTileState) {
             return Focus(
               focusNode: focusNode,
-              onFocusChange: (focused) => setTileState(() => isFocused = focused),
+              onFocusChange: (focused) =>
+                  setTileState(() => isFocused = focused),
               onKeyEvent: (node, event) {
-                if (event is KeyDownEvent && 
-                   (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.select ||
+                        event.logicalKey == LogicalKeyboardKey.enter)) {
                   onTap();
                   return KeyEventResult.handled;
                 }
@@ -246,9 +287,14 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
               child: GestureDetector(
                 onTap: onTap,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: isFocused ? AppColors.primary.withValues(alpha: 0.2) : Colors.transparent,
+                    color: isFocused
+                        ? AppColors.primary.withValues(alpha: 0.2)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isFocused ? AppColors.primary : Colors.white24,
@@ -258,12 +304,22 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(title, style: const TextStyle(color: Colors.white, fontSize: 18)),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          subtitle, 
-                          style: const TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.bold),
+                          subtitle,
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                           textAlign: TextAlign.right,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -273,9 +329,9 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                 ),
               ),
             );
-          }
+          },
         );
-      }
+      },
     );
   }
 
@@ -287,10 +343,12 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
           builder: (context, setBtnState) {
             return Focus(
               focusNode: focusNode,
-              onFocusChange: (focused) => setBtnState(() => isFocused = focused),
+              onFocusChange: (focused) =>
+                  setBtnState(() => isFocused = focused),
               onKeyEvent: (node, event) {
-                if (event is KeyDownEvent && 
-                   (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.select ||
+                        event.logicalKey == LogicalKeyboardKey.enter)) {
                   setState(() => _speed = speed);
                   widget.onSpeedChanged(speed);
                   return KeyEventResult.handled;
@@ -306,7 +364,11 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : (isFocused ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent),
+                    color: isSelected
+                        ? AppColors.primary
+                        : (isFocused
+                              ? AppColors.primary.withValues(alpha: 0.3)
+                              : Colors.transparent),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isFocused ? AppColors.primary : Colors.transparent,
@@ -317,18 +379,21 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                     '${speed}x',
                     style: TextStyle(
                       color: isSelected ? Colors.white : Colors.white70,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                       fontSize: 16,
                     ),
                   ),
                 ),
               ),
             );
-          }
+          },
         );
-      }
+      },
     );
   }
+
   Widget _buildDelayButton(IconData icon, VoidCallback onTap) {
     return Builder(
       builder: (context) {
@@ -336,10 +401,12 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
         return StatefulBuilder(
           builder: (context, setBtnState) {
             return Focus(
-              onFocusChange: (focused) => setBtnState(() => isFocused = focused),
+              onFocusChange: (focused) =>
+                  setBtnState(() => isFocused = focused),
               onKeyEvent: (node, event) {
-                if (event is KeyDownEvent && 
-                   (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.select ||
+                        event.logicalKey == LogicalKeyboardKey.enter)) {
                   onTap();
                   return KeyEventResult.handled;
                 }
@@ -350,20 +417,26 @@ class _PlayerSettingsDialogState extends State<PlayerSettingsDialog> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isFocused ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
+                    color: isFocused
+                        ? AppColors.primary.withValues(alpha: 0.3)
+                        : Colors.transparent,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isFocused ? AppColors.primary : Colors.white24,
                       width: isFocused ? 2 : 1,
                     ),
                   ),
-                  child: Icon(icon, color: isFocused ? AppColors.primary : Colors.white, size: 20),
+                  child: Icon(
+                    icon,
+                    color: isFocused ? AppColors.primary : Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
             );
-          }
+          },
         );
-      }
+      },
     );
   }
 }

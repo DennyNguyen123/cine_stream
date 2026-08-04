@@ -28,13 +28,20 @@ class DualSubtitleDisplay extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (topCue != null)
-            _buildSubText(topCue!.text, isDualEnabled ? AppColors.subtitleTop : AppColors.subtitleTop, isDualEnabled ? 22 : 24),
-          
-          if (topCue != null && bottomCue != null)
-            const SizedBox(height: 4),
+            _buildSubText(
+              topCue!.text,
+              isDualEnabled ? AppColors.subtitleTop : AppColors.subtitleTop,
+              isDualEnabled ? 22 : 24,
+            ),
+
+          if (topCue != null && bottomCue != null) const SizedBox(height: 4),
 
           if (bottomCue != null)
-            _buildSubText(bottomCue!.text, isDualEnabled ? AppColors.subtitleBottom : AppColors.subtitleTop, isDualEnabled ? 28 : 24),
+            _buildSubText(
+              bottomCue!.text,
+              isDualEnabled ? AppColors.subtitleBottom : AppColors.subtitleTop,
+              isDualEnabled ? 28 : 24,
+            ),
         ],
       ),
     );
@@ -44,7 +51,7 @@ class DualSubtitleDisplay extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha:0.65),
+        color: Colors.black.withValues(alpha: 0.65),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(

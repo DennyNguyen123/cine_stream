@@ -33,22 +33,23 @@ class _DebugOverlayState extends State<DebugOverlay> {
 
   void _updateStats() {
     final value = widget.controller.value;
-    
+
     // RAM usage
     _ramUsageMB = ProcessInfo.currentRss / (1024 * 1024);
-    
+
     // Video Resolution
     _resolution = '${value.size.width.toInt()}x${value.size.height.toInt()}';
-    
+
     // Position & Buffer
     _position = _formatDuration(value.position);
     if (value.buffered.isNotEmpty) {
       final lastBuffer = value.buffered.last;
-      _buffered = '${_formatDuration(lastBuffer.start)} - ${_formatDuration(lastBuffer.end)}';
+      _buffered =
+          '${_formatDuration(lastBuffer.start)} - ${_formatDuration(lastBuffer.end)}';
     } else {
       _buffered = '0s';
     }
-    
+
     // Status
     if (value.hasError) {
       _status = 'Error';
@@ -94,7 +95,11 @@ class _DebugOverlayState extends State<DebugOverlay> {
           children: [
             const Text(
               'DEBUG STATS',
-              style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             _buildStatRow('RAM Usage:', '${_ramUsageMB.toStringAsFixed(1)} MB'),
@@ -102,7 +107,10 @@ class _DebugOverlayState extends State<DebugOverlay> {
             _buildStatRow('Status:', _status),
             _buildStatRow('Position:', _position),
             _buildStatRow('Buffered:', _buffered),
-            _buildStatRow('Playback Speed:', '${widget.controller.value.playbackSpeed}x'),
+            _buildStatRow(
+              'Playback Speed:',
+              '${widget.controller.value.playbackSpeed}x',
+            ),
           ],
         ),
       ),
@@ -115,9 +123,24 @@ class _DebugOverlayState extends State<DebugOverlay> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'monospace')),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontFamily: 'monospace',
+            ),
+          ),
           const SizedBox(width: 8),
-          Text(value, style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.greenAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
+            ),
+          ),
         ],
       ),
     );

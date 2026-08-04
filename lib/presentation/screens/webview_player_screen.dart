@@ -79,7 +79,8 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
 
     // Special handling for Enter/Select: try to click the play button or focused element
     if (keyCode == 'Enter') {
-      _controller!.evaluateJavascript(source: '''
+      _controller!.evaluateJavascript(
+        source: '''
         var playBtn = document.getElementById('playbtnx');
         var activeEl = document.activeElement;
         
@@ -104,19 +105,23 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
           }
         }
-      ''');
+      ''',
+      );
       return;
     }
 
     // Dispatch other key events to the WebView
-    _controller!.evaluateJavascript(source: '''
+    _controller!.evaluateJavascript(
+      source:
+          '''
       document.dispatchEvent(new KeyboardEvent('keydown', {
         key: '$keyCode',
         code: '$keyCode',
         bubbles: true,
         cancelable: true
       }));
-    ''');
+    ''',
+    );
   }
 
   @override
@@ -133,12 +138,11 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
             InAppWebView(
               initialUrlRequest: URLRequest(
                 url: WebUri(widget.playerUrl),
-                headers: {
-                  'Referer': 'https://vidapi.xyz/',
-                },
+                headers: {'Referer': 'https://vidapi.xyz/'},
               ),
               initialSettings: InAppWebViewSettings(
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                userAgent:
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 mediaPlaybackRequiresUserGesture: false,
                 javaScriptEnabled: true,
                 allowsInlineMediaPlayback: true,
@@ -163,7 +167,8 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
                 if (mounted) setState(() => _isLoading = false);
 
                 // Auto-play script: continuously try to play for 5 seconds
-                await controller.evaluateJavascript(source: '''
+                await controller.evaluateJavascript(
+                  source: '''
                   var attempts = 0;
                   var interval = setInterval(function() {
                     attempts++;
@@ -192,13 +197,18 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
                     if (jwPlay) jwPlay.click();
                     
                   }, 500); // Check every 500ms
-                ''');
+                ''',
+                );
               },
               onReceivedError: (controller, request, error) {
-                debugPrint('[WebViewPlayer] Error: ${request.url} - ${error.description}');
+                debugPrint(
+                  '[WebViewPlayer] Error: ${request.url} - ${error.description}',
+                );
               },
               onConsoleMessage: (controller, consoleMessage) {
-                debugPrint('[WebViewPlayer] Console: ${consoleMessage.message}');
+                debugPrint(
+                  '[WebViewPlayer] Console: ${consoleMessage.message}',
+                );
               },
               // Block popup windows (ads)
               onCreateWindow: (controller, createWindowAction) async {
@@ -209,9 +219,7 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
             // Loading indicator
             if (_isLoading)
               const Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
-                ),
+                child: CircularProgressIndicator(color: AppColors.primary),
               ),
 
             // Back button - small, positioned top-left, doesn't block WebView
@@ -227,7 +235,11 @@ class _WebViewPlayerScreenState extends State<WebViewPlayerScreen> {
                     onTap: () => Navigator.pop(context),
                     child: const Padding(
                       padding: EdgeInsets.all(8),
-                      child: Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                      child: Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),

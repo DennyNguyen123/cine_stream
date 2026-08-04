@@ -10,11 +10,17 @@ import '../../../../domain/entities/subtitle.dart';
 import '../../../../core/errors/stream_extraction_exception.dart';
 
 class VidplayExtractor {
-  static Future<StreamInfo?> extractStream(String serverUrl, List<SubtitleTrack> subtitles) async {
+  static Future<StreamInfo?> extractStream(
+    String serverUrl,
+    List<SubtitleTrack> subtitles,
+  ) async {
     return await _extractMobile(serverUrl, subtitles);
   }
 
-  static Future<StreamInfo?> _extractMobile(String serverUrl, List<SubtitleTrack> subtitles) async {
+  static Future<StreamInfo?> _extractMobile(
+    String serverUrl,
+    List<SubtitleTrack> subtitles,
+  ) async {
     print('[VidplayExtractor] Loading player: $serverUrl');
 
     final completer = Completer<StreamInfo?>();
@@ -24,23 +30,27 @@ class VidplayExtractor {
     final timeoutTimer = Timer(const Duration(seconds: 15), () {
       if (!completer.isCompleted) {
         if (foundStreamUrl != null) {
-          completer.complete(StreamInfo(videoUrl: foundStreamUrl!, subtitles: subtitles));
+          completer.complete(
+            StreamInfo(videoUrl: foundStreamUrl!, subtitles: subtitles),
+          );
         } else {
           final uri = Uri.parse(serverUrl);
           final isTv = uri.path.contains('-tv');
           final id = uri.queryParameters['tmdb'] ?? uri.queryParameters['imdb'];
           final s = uri.queryParameters['s'];
           final e = uri.queryParameters['e'];
-          final directUrl = isTv 
+          final directUrl = isTv
               ? 'https://peachify.top/embed/tv/$id/$s/$e?autostart=true'
               : 'https://peachify.top/embed/movie/$id?autostart=true';
-              
-          completer.completeError(StreamExtractionException(
-            embedUrl: directUrl,
-            serverId: 'vpls',
-            subtitles: subtitles,
-            message: 'Timeout: no stream found after 15s',
-          ));
+
+          completer.completeError(
+            StreamExtractionException(
+              embedUrl: directUrl,
+              serverId: 'vpls',
+              subtitles: subtitles,
+              message: 'Timeout: no stream found after 15s',
+            ),
+          );
         }
       }
     });
@@ -51,22 +61,29 @@ class VidplayExtractor {
     final id = uri.queryParameters['tmdb'] ?? uri.queryParameters['imdb'];
     final s = uri.queryParameters['s'];
     final e = uri.queryParameters['e'];
-    
-    final directUrl = isTv 
+
+    final directUrl = isTv
         ? 'https://peachify.top/embed/tv/$id/$s/$e?autostart=true'
         : 'https://peachify.top/embed/movie/$id?autostart=true';
 
-    Future<String> resolveRedirect(String url, Map<String, String> headers) async {
-      print('[VidplayExtractor] resolveRedirect: waiting 1s for WebView to release connection...');
+    Future<String> resolveRedirect(
+      String url,
+      Map<String, String> headers,
+    ) async {
+      print(
+        '[VidplayExtractor] resolveRedirect: waiting 1s for WebView to release connection...',
+      );
       await Future.delayed(const Duration(seconds: 1));
-      
+
       final client = HttpClient();
       try {
         var request = await client.getUrl(Uri.parse(url));
         headers.forEach((k, v) => request.headers.set(k, v));
         request.followRedirects = false;
         var response = await request.close();
-        print('[VidplayExtractor] resolveRedirect status: ${response.statusCode}');
+        print(
+          '[VidplayExtractor] resolveRedirect status: ${response.statusCode}',
+        );
         if (response.isRedirect) {
           final loc = response.headers.value(HttpHeaders.locationHeader) ?? url;
           print('[VidplayExtractor] resolveRedirect location: $loc');
@@ -80,14 +97,24 @@ class VidplayExtractor {
         client.close();
       }
     }
-    final adPatterns = ['radiance', 'hexoic', 'doubleclick', 'googlesyndication', 'popads', 'adserver', 'popunder'];
+
+    final adPatterns = [
+      'radiance',
+      'hexoic',
+      'doubleclick',
+      'googlesyndication',
+      'popads',
+      'adserver',
+      'popunder',
+    ];
 
     headlessWebView = HeadlessInAppWebView(
       initialSize: Size(1280, 720),
       initialUrlRequest: URLRequest(url: WebUri(directUrl)),
       initialSettings: InAppWebViewSettings(
         useShouldOverrideUrlLoading: true,
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        userAgent:
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         mediaPlaybackRequiresUserGesture: false,
         allowsInlineMediaPlayback: true,
         javaScriptEnabled: true,
@@ -191,7 +218,7 @@ class VidplayExtractor {
           ''',
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
           forMainFrameOnly: false,
-        )
+        ),
       ]),
       onWebViewCreated: (controller) {
         controller.addJavaScriptHandler(
@@ -199,7 +226,9 @@ class VidplayExtractor {
           callback: (args) async {
             if (args.isNotEmpty) {
               final iframeSrc = args[0].toString();
-              print('[VidplayExtractor] ➡ Redirecting via JS Handler to: \$iframeSrc');
+              print(
+                '[VidplayExtractor] ➡ Redirecting via JS Handler to: \$iframeSrc',
+              );
               await controller.loadUrl(
                 urlRequest: URLRequest(
                   url: WebUri(iframeSrc),
@@ -216,16 +245,20 @@ class VidplayExtractor {
       onLoadStop: (controller, url) async {
         print('[VidplayExtractor] WebView loaded: $url');
         // Backup evaluateJavascript for main frame
-        await controller.evaluateJavascript(source: '''
+        await controller.evaluateJavascript(
+          source: '''
           var clickIntervalMain = setInterval(function() {
             document.querySelectorAll('[class*="play"], [id*="play"], button, .btn').forEach(function(b) { try { b.click(); } catch(e) {} });
             document.querySelectorAll('video').forEach(function(v) { try { v.play(); } catch(e) {} });
           }, 1500);
           setTimeout(() => clearInterval(clickIntervalMain), 14000);
-        ''');
+        ''',
+        );
       },
       onCreateWindow: (controller, createWindowAction) async {
-        print('[VidplayExtractor] ⚠ Blocked popup window: \${createWindowAction.request.url}');
+        print(
+          '[VidplayExtractor] ⚠ Blocked popup window: \${createWindowAction.request.url}',
+        );
         return false;
       },
       shouldInterceptRequest: (controller, request) async {
@@ -259,7 +292,15 @@ class VidplayExtractor {
           );
         }
 
-        final adPatterns = ['radiance', 'hexoic', 'doubleclick', 'googlesyndication', 'popads', 'adserver', 'popunder'];
+        final adPatterns = [
+          'radiance',
+          'hexoic',
+          'doubleclick',
+          'googlesyndication',
+          'popads',
+          'adserver',
+          'popunder',
+        ];
         if (adPatterns.any((p) => reqUrl.contains(p))) {
           return WebResourceResponse(
             data: Uint8List.fromList([]),
@@ -271,11 +312,13 @@ class VidplayExtractor {
 
         // TIK 2 source blocks Dart/ExoPlayer TLS fingerprint, returning 404.
         // We force the WebView's player to fallback to the next source (VID 2) which works in Dart.
-        if (reqUrl.contains('tik.1x2.space') || 
-            reqUrl.contains('nightspeedster.app') || 
-            reqUrl.contains('tiktoks.animanga.fun') || 
+        if (reqUrl.contains('tik.1x2.space') ||
+            reqUrl.contains('nightspeedster.app') ||
+            reqUrl.contains('tiktoks.animanga.fun') ||
             reqUrl.contains('animanga.fun')) {
-          print('[VidplayExtractor] ⚠ Blocked known tarpit to force fallback: $reqUrl');
+          print(
+            '[VidplayExtractor] ⚠ Blocked known tarpit to force fallback: $reqUrl',
+          );
           return WebResourceResponse(
             data: Uint8List.fromList([]),
             statusCode: 404,
@@ -284,25 +327,34 @@ class VidplayExtractor {
           );
         }
 
-        final isValidStream = RegExp(r'\.m3u8$|\.m3u8\?|master\.m3u8|playlist\.m3u8|index\.m3u8|mp4-proxy|\/v\/.*\.mp4|\/getm3u8\/|\/stream\/|cf-master.*\.txt', caseSensitive: false).hasMatch(reqUrl);
+        final isValidStream = RegExp(
+          r'\.m3u8$|\.m3u8\?|master\.m3u8|playlist\.m3u8|index\.m3u8|mp4-proxy|\/v\/.*\.mp4|\/getm3u8\/|\/stream\/|cf-master.*\.txt',
+          caseSensitive: false,
+        ).hasMatch(reqUrl);
         if (isValidStream) {
           final capturedUrl = reqUrl;
           if (!completer.isCompleted && foundStreamUrl == null) {
             foundStreamUrl = capturedUrl;
             print('[VidplayExtractor] ✓ Found genuine stream: $capturedUrl');
             timeoutTimer.cancel();
-            
+
             final headers = <String, String>{};
             if (request.headers != null) {
               request.headers!.forEach((k, v) => headers[k] = v);
             }
-            String referer = headers.entries.firstWhere((e) => e.key.toLowerCase() == 'referer', orElse: () => MapEntry('', '')).value;
+            String referer = headers.entries
+                .firstWhere(
+                  (e) => e.key.toLowerCase() == 'referer',
+                  orElse: () => MapEntry('', ''),
+                )
+                .value;
             if (referer.isEmpty) {
               referer = 'https://vidplay.site/';
               headers['Referer'] = referer;
             }
             if (!headers.keys.any((k) => k.toLowerCase() == 'user-agent')) {
-              headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+              headers['User-Agent'] =
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
             }
             if (!headers.keys.any((k) => k.toLowerCase() == 'origin')) {
               try {
@@ -310,27 +362,46 @@ class VidplayExtractor {
                 headers['Origin'] = '${uri.scheme}://${uri.host}';
               } catch (_) {}
             }
-            
+
             try {
               final cookieManager = CookieManager.instance();
-              final iframeCookies = await cookieManager.getCookies(url: WebUri(referer)).timeout(const Duration(seconds: 2));
-              final streamCookies = await cookieManager.getCookies(url: WebUri(capturedUrl)).timeout(const Duration(seconds: 2));
-              
+              final iframeCookies = await cookieManager
+                  .getCookies(url: WebUri(referer))
+                  .timeout(const Duration(seconds: 2));
+              final streamCookies = await cookieManager
+                  .getCookies(url: WebUri(capturedUrl))
+                  .timeout(const Duration(seconds: 2));
+
               final allCookies = <String, Cookie>{};
-              for (var c in iframeCookies) allCookies[c.name] = c;
-              for (var c in streamCookies) allCookies[c.name] = c;
-              
+              for (var c in iframeCookies) {
+                allCookies[c.name] = c;
+              }
+              for (var c in streamCookies) {
+                allCookies[c.name] = c;
+              }
+
               if (allCookies.isNotEmpty) {
-                headers['Cookie'] = allCookies.values.map((c) => '${c.name}=${c.value}').join('; ');
+                headers['Cookie'] = allCookies.values
+                    .map((c) => '${c.name}=${c.value}')
+                    .join('; ');
               }
             } catch (_) {}
 
             if (!completer.isCompleted) {
               try {
-                controller.evaluateJavascript(source: "document.querySelectorAll('video').forEach(function(v) { v.pause(); v.removeAttribute('src'); v.load(); });");
+                controller.evaluateJavascript(
+                  source:
+                      "document.querySelectorAll('video').forEach(function(v) { v.pause(); v.removeAttribute('src'); v.load(); });",
+                );
               } catch (_) {}
               final finalUrl = await resolveRedirect(capturedUrl, headers);
-              completer.complete(StreamInfo(videoUrl: finalUrl, subtitles: subtitles, headers: headers));
+              completer.complete(
+                StreamInfo(
+                  videoUrl: finalUrl,
+                  subtitles: subtitles,
+                  headers: headers,
+                ),
+              );
             }
           }
           // BLOCK the request so the token is not consumed by WebView
@@ -349,54 +420,94 @@ class VidplayExtractor {
         if (msg.startsWith('"') && msg.endsWith('"')) {
           msg = msg.substring(1, msg.length - 1);
         }
-        if (msg.startsWith('VIDEO_SRC:') || msg.startsWith('VIDEO_CURRENT_SRC:') || msg.startsWith('INTERCEPTED_STREAM:')) {
+        if (msg.startsWith('VIDEO_SRC:') ||
+            msg.startsWith('VIDEO_CURRENT_SRC:') ||
+            msg.startsWith('INTERCEPTED_STREAM:')) {
           final videoUrl = msg.split(':').skip(1).join(':');
-          if (videoUrl.isNotEmpty && !videoUrl.startsWith('blob:') && foundStreamUrl == null) {
+          if (videoUrl.isNotEmpty &&
+              !videoUrl.startsWith('blob:') &&
+              foundStreamUrl == null) {
             foundStreamUrl = videoUrl;
-            print('[VidplayExtractor] ✓ Found genuine stream (console): $videoUrl');
+            print(
+              '[VidplayExtractor] ✓ Found genuine stream (console): $videoUrl',
+            );
             timeoutTimer.cancel();
-            
+
             final headers = {
               'Referer': 'https://peachify.top/',
               'Origin': 'https://peachify.top',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             };
             try {
               final cookieManager = CookieManager.instance();
-              final iframeCookies = await cookieManager.getCookies(url: WebUri('https://vidplay.online/')).timeout(const Duration(seconds: 2));
-              final streamCookies = await cookieManager.getCookies(url: WebUri(foundStreamUrl!)).timeout(const Duration(seconds: 2));
-              
+              final iframeCookies = await cookieManager
+                  .getCookies(url: WebUri('https://vidplay.online/'))
+                  .timeout(const Duration(seconds: 2));
+              final streamCookies = await cookieManager
+                  .getCookies(url: WebUri(foundStreamUrl!))
+                  .timeout(const Duration(seconds: 2));
+
               final allCookies = <String, Cookie>{};
-              for (var c in iframeCookies) allCookies[c.name] = c;
-              for (var c in streamCookies) allCookies[c.name] = c;
-              
+              for (var c in iframeCookies) {
+                allCookies[c.name] = c;
+              }
+              for (var c in streamCookies) {
+                allCookies[c.name] = c;
+              }
+
               if (allCookies.isNotEmpty) {
-                headers['Cookie'] = allCookies.values.map((c) => '${c.name}=${c.value}').join('; ');
+                headers['Cookie'] = allCookies.values
+                    .map((c) => '${c.name}=${c.value}')
+                    .join('; ');
               }
             } catch (_) {}
 
             if (!completer.isCompleted) {
               try {
-                controller.evaluateJavascript(source: "document.querySelectorAll('video').forEach(function(v) { v.pause(); v.removeAttribute('src'); v.load(); });");
+                controller.evaluateJavascript(
+                  source:
+                      "document.querySelectorAll('video').forEach(function(v) { v.pause(); v.removeAttribute('src'); v.load(); });",
+                );
               } catch (_) {}
               final finalUrl = await resolveRedirect(foundStreamUrl!, headers);
-              completer.complete(StreamInfo(videoUrl: finalUrl, subtitles: subtitles, headers: headers));
+              completer.complete(
+                StreamInfo(
+                  videoUrl: finalUrl,
+                  subtitles: subtitles,
+                  headers: headers,
+                ),
+              );
             }
           }
         }
       },
       onJsAlert: (controller, jsAlertRequest) async {
-        return JsAlertResponse(handledByClient: true, action: JsAlertResponseAction.CONFIRM);
+        return JsAlertResponse(
+          handledByClient: true,
+          action: JsAlertResponseAction.CONFIRM,
+        );
       },
       onJsConfirm: (controller, jsConfirmRequest) async {
-        return JsConfirmResponse(handledByClient: true, action: JsConfirmResponseAction.CONFIRM);
+        return JsConfirmResponse(
+          handledByClient: true,
+          action: JsConfirmResponseAction.CONFIRM,
+        );
       },
       onJsPrompt: (controller, jsPromptRequest) async {
-        return JsPromptResponse(handledByClient: true, action: JsPromptResponseAction.CONFIRM);
+        return JsPromptResponse(
+          handledByClient: true,
+          action: JsPromptResponseAction.CONFIRM,
+        );
       },
       onJsBeforeUnload: (controller, jsBeforeUnloadRequest) async {
-        print('[VidplayExtractor] ⚠ Blocked main frame redirect (beforeunload): \${jsBeforeUnloadRequest.url}');
-        return JsBeforeUnloadResponse(handledByClient: true, action: JsBeforeUnloadResponseAction.CANCEL);
+        print(
+          '[VidplayExtractor] ⚠ Blocked main frame redirect (beforeunload): \${jsBeforeUnloadRequest.url}',
+        );
+        return JsBeforeUnloadResponse(
+          handledByClient: true,
+          action: JsBeforeUnloadResponseAction.CANCEL,
+        );
       },
     );
 
@@ -410,17 +521,17 @@ class VidplayExtractor {
       print('[VidplayExtractor] Error: $e');
       timeoutTimer.cancel();
       await headlessWebView.dispose();
-      
+
       if (e is StreamExtractionException) {
-        throw e;
+        rethrow;
       }
-      
+
       final uri = Uri.parse(serverUrl);
       final isTv = uri.path.contains('-tv');
       final id = uri.queryParameters['tmdb'] ?? uri.queryParameters['imdb'];
       final s = uri.queryParameters['s'];
       final eParam = uri.queryParameters['e'];
-      final directUrl = isTv 
+      final directUrl = isTv
           ? 'https://peachify.top/embed/tv/$id/$s/$eParam?autostart=true'
           : 'https://peachify.top/embed/movie/$id?autostart=true';
 
@@ -432,6 +543,4 @@ class VidplayExtractor {
       );
     }
   }
-
-
 }

@@ -8,10 +8,14 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'core/theme/app_theme.dart';
 import 'di/injection.dart';
 import 'presentation/screens/home_screen.dart';
+import 'package:cine_stream/src/rust/frb_generated.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Khởi tạo Rust backend core
+  await RustLib.init();
+
   if (Platform.isWindows) {
     try {
       final availableVersion = await WebViewEnvironment.getAvailableVersion();
@@ -28,7 +32,7 @@ void main() async {
   MediaKit.ensureInitialized();
   VideoPlayerMediaKit.ensureInitialized(windows: true, linux: true);
   await setupInjection();
-  
+
   // Cho phép cả màn hình dọc và ngang
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

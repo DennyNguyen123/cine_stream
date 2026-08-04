@@ -25,13 +25,16 @@ void main() {
       expect(movies.first.title.toLowerCase(), contains('inception'));
     });
 
-    test('getMovieDetail returns details and episodes for Game of Thrones', () async {
-      final detail = await source.getMovieDetail('series/tt0944947');
-      expect(detail, isNotNull);
-      expect(detail!.title, 'Game of Thrones');
-      expect(detail.type, 'series');
-      expect(detail.episodes, isNotEmpty);
-      expect(detail.episodes.first.id, contains('tv/tt0944947'));
-    });
+    test(
+      'getMovieDetail returns details and episodes for Game of Thrones',
+      () async {
+        final detail = await source.getMovieDetail('series/tt0944947');
+        expect(detail, isNotNull);
+        expect(detail!.title, 'Game of Thrones');
+        expect(detail.type, 'series');
+        expect(detail.episodes, isNotEmpty);
+        expect(detail.episodes.first.id, contains('tv/tt0944947'));
+      },
+    );
   });
 }

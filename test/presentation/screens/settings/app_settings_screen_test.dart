@@ -40,10 +40,10 @@ void main() {
   });
 
   group('AppSettingsScreen UI & Config Tests', () {
-    testWidgets('Displays all sections including Voice-over', (WidgetTester tester) async {
-      await tester.pumpWidget(const MaterialApp(
-        home: WebdavSetupScreen(),
-      ));
+    testWidgets('Displays all sections including Voice-over', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(const MaterialApp(home: WebdavSetupScreen()));
 
       // Đảm bảo hiển thị tiêu đề và QR Section
       expect(find.text('Show QR'), findsOneWidget);
@@ -56,39 +56,40 @@ void main() {
       expect(find.text('Voice-over Engine'), findsOneWidget);
     });
 
-    testWidgets('Progressive Disclosure hides OpenAI fields when System Default is selected', (WidgetTester tester) async {
-      // Set test screen size to avoid being off-screen
-      tester.view.physicalSize = const Size(1200, 1800);
-      tester.view.devicePixelRatio = 1.0;
+    testWidgets(
+      'Progressive Disclosure hides OpenAI fields when System Default is selected',
+      (WidgetTester tester) async {
+        // Set test screen size to avoid being off-screen
+        tester.view.physicalSize = const Size(1200, 1800);
+        tester.view.devicePixelRatio = 1.0;
 
-      await tester.pumpWidget(const MaterialApp(
-        home: WebdavSetupScreen(),
-      ));
+        await tester.pumpWidget(const MaterialApp(home: WebdavSetupScreen()));
 
-      // Mặc định engine là Native/System Default nên không hiển thị OpenAI Base URL
-      expect(find.text('OpenAI Base URL'), findsNothing);
-      expect(find.text('OpenAI API Key'), findsNothing);
+        // Mặc định engine là Native/System Default nên không hiển thị OpenAI Base URL
+        expect(find.text('OpenAI Base URL'), findsNothing);
+        expect(find.text('OpenAI API Key'), findsNothing);
 
-      // Chọn OpenAI engine từ Dropdown
-      final dropdown = find.byKey(const Key('tts_engine_dropdown'));
-      expect(dropdown, findsOneWidget);
+        // Chọn OpenAI engine từ Dropdown
+        final dropdown = find.byKey(const Key('tts_engine_dropdown'));
+        expect(dropdown, findsOneWidget);
 
-      await tester.tap(dropdown);
-      await tester.pumpAndSettle();
+        await tester.tap(dropdown);
+        await tester.pumpAndSettle();
 
-      // Trong flutter tests, khi nhấn DropdownButtonFormField, các DropdownMenuItem 
-      // sẽ được đưa vào menu popup. Tìm item có chứa text 'OpenAI Compatible'
-      final openAiOption = find.text('OpenAI Compatible').last;
-      await tester.tap(openAiOption);
-      await tester.pumpAndSettle();
+        // Trong flutter tests, khi nhấn DropdownButtonFormField, các DropdownMenuItem
+        // sẽ được đưa vào menu popup. Tìm item có chứa text 'OpenAI Compatible'
+        final openAiOption = find.text('OpenAI Compatible').last;
+        await tester.tap(openAiOption);
+        await tester.pumpAndSettle();
 
-      // Hiện các field cấu hình OpenAI
-      expect(find.text('OpenAI Base URL'), findsOneWidget);
-      expect(find.text('OpenAI API Key'), findsOneWidget);
-      
-      // Reset view size sau khi test xong
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-    });
+        // Hiện các field cấu hình OpenAI
+        expect(find.text('OpenAI Base URL'), findsOneWidget);
+        expect(find.text('OpenAI API Key'), findsOneWidget);
+
+        // Reset view size sau khi test xong
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+      },
+    );
   });
 }

@@ -32,11 +32,7 @@ class KissKhEpisodeJson {
   final double number;
   final int sub;
 
-  KissKhEpisodeJson({
-    required this.id,
-    required this.number,
-    this.sub = 0,
-  });
+  KissKhEpisodeJson({required this.id, required this.number, this.sub = 0});
 
   factory KissKhEpisodeJson.fromJson(Map<String, dynamic> json) {
     return KissKhEpisodeJson(
@@ -72,7 +68,9 @@ class KissKhMovieDetailJson {
       description: json['description'] as String?,
       thumbnail: json['thumbnail'] as String?,
       type: json['type'] as String?,
-      episodes: episodesList?.map((e) => KissKhEpisodeJson.fromJson(e)).toList() ?? [],
+      episodes:
+          episodesList?.map((e) => KissKhEpisodeJson.fromJson(e)).toList() ??
+          [],
     );
   }
 }
@@ -82,11 +80,7 @@ class KissKhSubtitleJson {
   final String label;
   final String? land;
 
-  KissKhSubtitleJson({
-    required this.src,
-    required this.label,
-    this.land,
-  });
+  KissKhSubtitleJson({required this.src, required this.label, this.land});
 
   factory KissKhSubtitleJson.fromJson(Map<String, dynamic> json) {
     return KissKhSubtitleJson(

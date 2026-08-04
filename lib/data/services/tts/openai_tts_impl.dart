@@ -40,10 +40,10 @@ class OpenAiTtsImpl implements TtsService {
     AudioPlayer? player,
     required SharedPreferences prefs,
     required TtsService nativeFallback,
-  })  : _dio = dio ?? Dio(),
-        _player = player ?? AudioPlayer(),
-        _prefs = prefs,
-        _nativeFallback = nativeFallback;
+  }) : _dio = dio ?? Dio(),
+       _player = player ?? AudioPlayer(),
+       _prefs = prefs,
+       _nativeFallback = nativeFallback;
 
   @override
   Future<void> init() async {
@@ -53,9 +53,7 @@ class OpenAiTtsImpl implements TtsService {
         const AudioContext(
           iOS: AudioContextIOS(
             category: AVAudioSessionCategory.playback,
-            options: [
-              AVAudioSessionOptions.mixWithOthers,
-            ],
+            options: [AVAudioSessionOptions.mixWithOthers],
           ),
           android: AudioContextAndroid(
             audioFocus: AndroidAudioFocus.none,
@@ -84,12 +82,17 @@ class OpenAiTtsImpl implements TtsService {
     }
 
     final completer = Completer<void>();
-    
+
     // Đẩy việc thực thi speak vào queue lock
     _lock = _lock.then((_) async {
       try {
         if (_isDisposed) return;
-        await _executeSpeak(cleanText, durationMs, videoPlaybackSpeed, languageCode);
+        await _executeSpeak(
+          cleanText,
+          durationMs,
+          videoPlaybackSpeed,
+          languageCode,
+        );
       } catch (e, stack) {
         getIt<LogService>().error('OpenAI TTS speak failed', e, stack);
       } finally {
@@ -119,7 +122,13 @@ class OpenAiTtsImpl implements TtsService {
     if (_prefetchCache.containsKey(cacheKey)) return;
 
     try {
-      final bytes = await _generateSpeechBytes(cleanText, durationMs, videoPlaybackSpeed, languageCode, null);
+      final bytes = await _generateSpeechBytes(
+        cleanText,
+        durationMs,
+        videoPlaybackSpeed,
+        languageCode,
+        null,
+      );
       _addToCache(cacheKey, bytes);
       print('[OpenAI TTS] Prefetched and cached speech for text: "$cleanText"');
     } catch (_) {
@@ -150,18 +159,25 @@ class OpenAiTtsImpl implements TtsService {
       cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
     }
     final fullUrl = '$cleanUrl/audio/speech';
-    
+
     // Tính toán tốc độ đọc tự động dựa trên độ dài văn bản và thời gian hiển thị
     double speedMultiplier = 1.25; // Nâng tốc độ nền lên thêm 25%
     if (durationMs > 0) {
-      final cleanText = text.replaceAll(RegExp(r'\[.*?\]|\(.*?\)', dotAll: true), '').trim();
-      final wordCount = cleanText.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+      final cleanText = text
+          .replaceAll(RegExp(r'\[.*?\]|\(.*?\)', dotAll: true), '')
+          .trim();
+      final wordCount = cleanText
+          .split(RegExp(r'\s+'))
+          .where((w) => w.isNotEmpty)
+          .length;
       if (wordCount > 0) {
         // Ước lượng thời gian cần thiết (tăng 20% độ nhạy): tối thiểu 456ms cho mỗi từ và 96ms cho mỗi ký tự
         final estimatedMsByWords = wordCount * 456;
         final estimatedMsByChars = cleanText.length * 96;
-        final estimatedMs = estimatedMsByWords > estimatedMsByChars ? estimatedMsByWords : estimatedMsByChars;
-        
+        final estimatedMs = estimatedMsByWords > estimatedMsByChars
+            ? estimatedMsByWords
+            : estimatedMsByChars;
+
         final calculatedMultiplier = estimatedMs / durationMs;
         if (calculatedMultiplier > speedMultiplier) {
           speedMultiplier = calculatedMultiplier;
@@ -214,7 +230,13 @@ class OpenAiTtsImpl implements TtsService {
       bytes = _prefetchCache.remove(cacheKey)!;
       print('[OpenAI TTS] Cache hit for text: "$text"');
     } else {
-      bytes = await _generateSpeechBytes(text, durationMs, videoPlaybackSpeed, languageCode, _cancelToken);
+      bytes = await _generateSpeechBytes(
+        text,
+        durationMs,
+        videoPlaybackSpeed,
+        languageCode,
+        _cancelToken,
+      );
     }
 
     if (_isDisposed) return;

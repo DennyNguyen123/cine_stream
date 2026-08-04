@@ -11,7 +11,7 @@ import '../../../data/services/tts/native_tts_impl.dart';
 import '../../widgets/ui_helpers.dart';
 
 class WebdavSetupScreen extends StatefulWidget {
-  const WebdavSetupScreen({Key? key}) : super(key: key);
+  const WebdavSetupScreen({super.key});
 
   @override
   State<WebdavSetupScreen> createState() => _WebdavSetupScreenState();
@@ -76,7 +76,8 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
       if (mounted) {
         setState(() {
           _systemVoices = voices;
-          if (_ttsEngine == 'native' && (_ttsVoice.isEmpty || !_systemVoices.contains(_ttsVoice))) {
+          if (_ttsEngine == 'native' &&
+              (_ttsVoice.isEmpty || !_systemVoices.contains(_ttsVoice))) {
             if (_systemVoices.isNotEmpty) {
               _ttsVoice = _systemVoices.first;
             }
@@ -129,10 +130,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
     _urlController.text = prefs.getString('cinestream_webdav_url') ?? '';
     _userController.text = prefs.getString('cinestream_webdav_user') ?? '';
     _passController.text = prefs.getString('cinestream_webdav_pass') ?? '';
-    _pathController.text = prefs.getString('cinestream_webdav_path') ?? '/CineStream';
+    _pathController.text =
+        prefs.getString('cinestream_webdav_path') ?? '/CineStream';
 
     _ttsEngine = prefs.getString('tts_engine') ?? 'native';
-    _ttsUrlController.text = prefs.getString('tts_base_url') ?? 'https://api.openai.com/v1';
+    _ttsUrlController.text =
+        prefs.getString('tts_base_url') ?? 'https://api.openai.com/v1';
     _ttsKeyController.text = prefs.getString('tts_api_key') ?? '';
     _ttsModelController.text = prefs.getString('tts_model') ?? 'tts-1';
     _ttsVoice = prefs.getString('tts_voice') ?? '';
@@ -183,14 +186,20 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings saved successfully!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Settings saved successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context);
       }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings saved, but WebDAV connection failed.'), backgroundColor: Colors.orange),
+          const SnackBar(
+            content: Text('Settings saved, but WebDAV connection failed.'),
+            backgroundColor: Colors.orange,
+          ),
         );
       }
     }
@@ -213,17 +222,26 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // SECTION 1: GENERAL SETTINGS
-            _buildSectionHeader("General Settings"),
+            _buildSectionHeader('General Settings'),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _ttsTargetLang,
+              initialValue: _ttsTargetLang,
               dropdownColor: AppColors.surface,
               style: const TextStyle(color: AppColors.text),
               decoration: InputDecoration(
                 labelText: 'Voice-over Target Language',
                 labelStyle: const TextStyle(color: AppColors.textSecondary),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 2,
+                  ),
+                ),
               ),
               items: const [
                 DropdownMenuItem(value: 'vi', child: Text('Vietnamese (vi)')),
@@ -240,7 +258,13 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Voice-over Delay', style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w500)),
+                const Text(
+                  'Voice-over Delay',
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 Row(
                   children: [
                     _buildDelayButton(Icons.remove, () {
@@ -253,8 +277,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                     SizedBox(
                       width: 80,
                       child: Text(
-                        '${_ttsDelayMs.toInt()} ms', 
-                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 16),
+                        '${_ttsDelayMs.toInt()} ms',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -281,7 +309,7 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             const SizedBox(height: 24),
 
             // SECTION 2: QUICK SYNC
-            _buildSectionHeader("Quick Sync via QR"),
+            _buildSectionHeader('Quick Sync via QR'),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -290,7 +318,10 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                     icon: Icons.qr_code,
                     label: 'Show QR',
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const TvSyncScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const TvSyncScreen()),
+                      );
                     },
                   ),
                 ),
@@ -300,7 +331,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                     icon: Icons.qr_code_scanner,
                     label: 'Scan QR',
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MobileSyncScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MobileSyncScreen(),
+                        ),
+                      );
                     },
                   ),
                 ),
@@ -311,7 +347,7 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             const SizedBox(height: 24),
 
             // SECTION 2: WEBDAV CONFIG
-            _buildSectionHeader("WebDAV Configuration"),
+            _buildSectionHeader('WebDAV Configuration'),
             const SizedBox(height: 16),
             TextField(
               controller: _urlController,
@@ -322,8 +358,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                 labelText: 'WebDAV URL',
                 hintText: 'E.g.: https://alist.domain.com/dav/',
                 labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.primary),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -335,8 +375,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               decoration: const InputDecoration(
                 labelText: 'Username',
                 labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.primary),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -349,8 +393,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               decoration: const InputDecoration(
                 labelText: 'Password',
                 labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.primary),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -363,8 +411,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                 labelText: 'Remote Sync Folder',
                 hintText: 'E.g.: /CineStream',
                 labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.primary),
+                ),
               ),
             ),
             const SizedBox(height: 32),
@@ -372,31 +424,46 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
             const SizedBox(height: 24),
 
             // SECTION 3: VOICE-OVER CONFIG
-            _buildSectionHeader("Voice-over Settings"),
+            _buildSectionHeader('Voice-over Settings'),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               key: const Key('tts_engine_dropdown'),
-              value: _ttsEngine,
+              initialValue: _ttsEngine,
               focusNode: _ttsEngineFocus,
               dropdownColor: AppColors.surface,
               style: const TextStyle(color: AppColors.text, fontSize: 16),
               decoration: const InputDecoration(
                 labelText: 'Voice-over Engine',
                 labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.primary),
+                ),
               ),
               items: const [
-                DropdownMenuItem(value: 'native', child: Text('System Default')),
-                DropdownMenuItem(value: 'openai', child: Text('OpenAI Compatible')),
-                DropdownMenuItem(value: 'edge', child: Text('Microsoft Edge (Free)')),
+                DropdownMenuItem(
+                  value: 'native',
+                  child: Text('System Default'),
+                ),
+                DropdownMenuItem(
+                  value: 'openai',
+                  child: Text('OpenAI Compatible'),
+                ),
+                DropdownMenuItem(
+                  value: 'edge',
+                  child: Text('Microsoft Edge (Free)'),
+                ),
               ],
               onChanged: (val) {
                 if (val != null) {
                   setState(() {
                     _ttsEngine = val;
                     if (val == 'native') {
-                      _ttsVoice = _systemVoices.isNotEmpty ? _systemVoices.first : '';
+                      _ttsVoice = _systemVoices.isNotEmpty
+                          ? _systemVoices.first
+                          : '';
                     } else if (val == 'edge') {
                       _ttsVoice = 'vi-VN-HoaiMyNeural';
                     } else {
@@ -418,8 +485,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                   labelText: 'OpenAI Base URL',
                   hintText: 'E.g.: https://api.openai.com/v1',
                   labelStyle: TextStyle(color: AppColors.textSecondary),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -433,8 +504,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                   labelText: 'OpenAI API Key',
                   hintText: 'Enter API Key',
                   labelStyle: TextStyle(color: AppColors.textSecondary),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -447,8 +522,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                   labelText: 'TTS Model',
                   hintText: 'tts-1 or tts-1-hd',
                   labelStyle: TextStyle(color: AppColors.textSecondary),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -459,45 +538,75 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                 style: const TextStyle(color: AppColors.text),
                 decoration: const InputDecoration(
                   labelText: 'TTS Voice',
-                  hintText: 'alloy, echo, or custom (leave empty if not needed)',
+                  hintText:
+                      'alloy, echo, or custom (leave empty if not needed)',
                   labelStyle: TextStyle(color: AppColors.textSecondary),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
                 ),
               ),
             ] else if (_ttsEngine == 'edge') ...[
               // Edge TTS Voice Selection
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: [
-                  'vi-VN-HoaiMyNeural',
-                  'vi-VN-NamMinhNeural',
-                  'en-US-AvaNeural',
-                  'en-US-AndrewNeural',
-                  'en-US-EmmaNeural',
-                  'en-US-BrianNeural'
-                ].contains(_ttsVoice) ? _ttsVoice : 'vi-VN-HoaiMyNeural',
+                initialValue:
+                    [
+                      'vi-VN-HoaiMyNeural',
+                      'vi-VN-NamMinhNeural',
+                      'en-US-AvaNeural',
+                      'en-US-AndrewNeural',
+                      'en-US-EmmaNeural',
+                      'en-US-BrianNeural',
+                    ].contains(_ttsVoice)
+                    ? _ttsVoice
+                    : 'vi-VN-HoaiMyNeural',
                 focusNode: _ttsVoiceFocus,
                 dropdownColor: AppColors.surface,
                 style: const TextStyle(color: AppColors.text, fontSize: 14),
                 decoration: const InputDecoration(
                   labelText: 'Edge TTS Voice',
                   labelStyle: TextStyle(color: AppColors.textSecondary),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'vi-VN-HoaiMyNeural', child: Text('Hoài Mỹ (Nữ Nam - vi-VN)')),
-                  DropdownMenuItem(value: 'vi-VN-NamMinhNeural', child: Text('Nam Minh (Nam Bắc - vi-VN)')),
-                  DropdownMenuItem(value: 'en-US-AvaNeural', child: Text('Ava (Nữ - en-US)')),
-                  DropdownMenuItem(value: 'en-US-AndrewNeural', child: Text('Andrew (Nam - en-US)')),
-                  DropdownMenuItem(value: 'en-US-EmmaNeural', child: Text('Emma (Nữ - en-US)')),
-                  DropdownMenuItem(value: 'en-US-BrianNeural', child: Text('Brian (Nam - en-US)')),
+                  DropdownMenuItem(
+                    value: 'vi-VN-HoaiMyNeural',
+                    child: Text('Hoài Mỹ (Nữ Nam - vi-VN)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'vi-VN-NamMinhNeural',
+                    child: Text('Nam Minh (Nam Bắc - vi-VN)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'en-US-AvaNeural',
+                    child: Text('Ava (Nữ - en-US)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'en-US-AndrewNeural',
+                    child: Text('Andrew (Nam - en-US)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'en-US-EmmaNeural',
+                    child: Text('Emma (Nữ - en-US)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'en-US-BrianNeural',
+                    child: Text('Brian (Nam - en-US)'),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
-                    setState(() { 
-                      _ttsVoice = val; 
+                    setState(() {
+                      _ttsVoice = val;
                     });
                   }
                 },
@@ -507,23 +616,29 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               if (_systemVoices.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: _systemVoices.contains(_ttsVoice) ? _ttsVoice : _systemVoices.first,
+                  initialValue: _systemVoices.contains(_ttsVoice)
+                      ? _ttsVoice
+                      : _systemVoices.first,
                   focusNode: _ttsVoiceFocus,
                   dropdownColor: AppColors.surface,
                   style: const TextStyle(color: AppColors.text, fontSize: 14),
                   decoration: const InputDecoration(
                     labelText: 'System TTS Voice',
                     labelStyle: TextStyle(color: AppColors.textSecondary),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: AppColors.primary),
+                    ),
                   ),
                   items: _systemVoices.map((voice) {
                     return DropdownMenuItem(value: voice, child: Text(voice));
                   }).toList(),
                   onChanged: (val) {
                     if (val != null) {
-                      setState(() { 
-                        _ttsVoice = val; 
+                      setState(() {
+                        _ttsVoice = val;
                       });
                     }
                   },
@@ -538,10 +653,15 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 icon: const Icon(Icons.volume_up, color: AppColors.primary),
-                label: const Text("Review Voice", style: TextStyle(color: AppColors.primary)),
+                label: const Text(
+                  'Review Voice',
+                  style: TextStyle(color: AppColors.primary),
+                ),
                 onPressed: () async {
                   // Lưu tạm cấu hình vào SharedPreferences để Engine đọc được ngay
                   if (_ttsEngine == 'openai') {
@@ -549,21 +669,31 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                   }
                   final prefs = getIt<SharedPreferences>();
                   await prefs.setString('tts_engine', _ttsEngine);
-                  await prefs.setString('tts_base_url', _ttsUrlController.text.trim());
-                  await prefs.setString('tts_api_key', _ttsKeyController.text.trim());
-                  await prefs.setString('tts_model', _ttsModelController.text.trim());
+                  await prefs.setString(
+                    'tts_base_url',
+                    _ttsUrlController.text.trim(),
+                  );
+                  await prefs.setString(
+                    'tts_api_key',
+                    _ttsKeyController.text.trim(),
+                  );
+                  await prefs.setString(
+                    'tts_model',
+                    _ttsModelController.text.trim(),
+                  );
                   await prefs.setString('tts_voice', _ttsVoice);
 
                   // Phát thử giọng đọc
-                  String reviewText = "This is a test of Cine Stream voice-over.";
+                  String reviewText =
+                      'This is a test of Cine Stream voice-over.';
                   if (_ttsTargetLang == 'vi') {
-                    reviewText = "Xin chào, đây là giọng đọc thử nghiệm.";
+                    reviewText = 'Xin chào, đây là giọng đọc thử nghiệm.';
                   } else if (_ttsTargetLang == 'ja') {
-                    reviewText = "こんにちは、これは音声テストです。";
+                    reviewText = 'こんにちは、これは音声テストです。';
                   } else if (_ttsTargetLang == 'ko') {
-                    reviewText = "안녕하세요, 이것은 음성 테스트입니다.";
+                    reviewText = '안녕하세요, 이것은 음성 테스트입니다.';
                   } else if (_ttsTargetLang == 'zh') {
-                    reviewText = "你好，这是语音测试。";
+                    reviewText = '你好，这是语音测试。';
                   }
 
                   await getIt<TtsService>().speak(
@@ -584,12 +714,28 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 onPressed: _isTesting ? null : _saveAllSettings,
-                child: _isTesting 
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text("Save Settings", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                child: _isTesting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Save Settings',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 16),
@@ -601,7 +747,9 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 onPressed: () async {
                   final logService = getIt<LogService>();
@@ -609,13 +757,20 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(success ? 'Logs uploaded successfully!' : 'Failed to upload logs. Ensure WebDAV is connected.'),
+                        content: Text(
+                          success
+                              ? 'Logs uploaded successfully!'
+                              : 'Failed to upload logs. Ensure WebDAV is connected.',
+                        ),
                         backgroundColor: success ? Colors.green : Colors.red,
                       ),
                     );
                   }
                 },
-                child: const Text("Upload Logs to WebDAV", style: TextStyle(fontSize: 16, color: Colors.white)),
+                child: const Text(
+                  'Upload Logs to WebDAV',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ),
             ),
             const SizedBox(height: 32),
@@ -643,10 +798,12 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
         return StatefulBuilder(
           builder: (context, setBtnState) {
             return Focus(
-              onFocusChange: (focused) => setBtnState(() => isFocused = focused),
+              onFocusChange: (focused) =>
+                  setBtnState(() => isFocused = focused),
               onKeyEvent: (node, event) {
-                if (event is KeyDownEvent && 
-                   (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.select ||
+                        event.logicalKey == LogicalKeyboardKey.enter)) {
                   onTap();
                   return KeyEventResult.handled;
                 }
@@ -657,34 +814,46 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isFocused ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
+                    color: isFocused
+                        ? AppColors.primary.withValues(alpha: 0.3)
+                        : Colors.transparent,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isFocused ? AppColors.primary : AppColors.border,
                       width: isFocused ? 2 : 1,
                     ),
                   ),
-                  child: Icon(icon, color: isFocused ? AppColors.primary : AppColors.text, size: 24),
+                  child: Icon(
+                    icon,
+                    color: isFocused ? AppColors.primary : AppColors.text,
+                    size: 24,
+                  ),
                 ),
               ),
             );
-          }
+          },
         );
-      }
+      },
     );
   }
 
-  Widget _buildFocusableActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
+  Widget _buildFocusableActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return Builder(
       builder: (context) {
         bool isFocused = false;
         return StatefulBuilder(
           builder: (context, setBtnState) {
             return Focus(
-              onFocusChange: (focused) => setBtnState(() => isFocused = focused),
+              onFocusChange: (focused) =>
+                  setBtnState(() => isFocused = focused),
               onKeyEvent: (node, event) {
-                if (event is KeyDownEvent && 
-                   (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.select ||
+                        event.logicalKey == LogicalKeyboardKey.enter)) {
                   onTap();
                   return KeyEventResult.handled;
                 }
@@ -695,7 +864,9 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: isFocused ? AppColors.primary.withValues(alpha: 0.2) : Colors.transparent,
+                    color: isFocused
+                        ? AppColors.primary.withValues(alpha: 0.2)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isFocused ? AppColors.primary : AppColors.border,
@@ -705,17 +876,26 @@ class _WebdavSetupScreenState extends State<WebdavSetupScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(icon, color: isFocused ? AppColors.primary : AppColors.text),
+                      Icon(
+                        icon,
+                        color: isFocused ? AppColors.primary : AppColors.text,
+                      ),
                       const SizedBox(width: 8),
-                      Text(label, style: TextStyle(color: isFocused ? AppColors.primary : AppColors.text, fontWeight: FontWeight.bold)),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: isFocused ? AppColors.primary : AppColors.text,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
             );
-          }
+          },
         );
-      }
+      },
     );
   }
 }

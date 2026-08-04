@@ -5,11 +5,14 @@ import '../../../../data/repositories/history_repository.dart';
 abstract class HistoryState {}
 
 class HistoryInitial extends HistoryState {}
+
 class HistoryLoading extends HistoryState {}
+
 class HistoryLoaded extends HistoryState {
   final List<HistoryItem> items;
   HistoryLoaded(this.items);
 }
+
 class HistoryError extends HistoryState {
   final String message;
   HistoryError(this.message);
@@ -25,7 +28,7 @@ class HistoryCubit extends Cubit<HistoryState> {
     try {
       final items = await _repository.getHistory();
       emit(HistoryLoaded(items));
-      
+
       // Background sync and refresh
       _repository.syncWithWebDAV().then((_) async {
         final newItems = await _repository.getHistory();

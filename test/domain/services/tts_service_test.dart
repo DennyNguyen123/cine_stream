@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
@@ -7,7 +6,6 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 
-import 'package:cine_stream/domain/services/tts_service.dart';
 import 'package:cine_stream/data/services/tts/native_tts_impl.dart';
 import 'package:cine_stream/data/services/tts/openai_tts_impl.dart';
 import 'package:cine_stream/data/services/tts/edge_tts_impl.dart';
@@ -91,7 +89,8 @@ class MockAudioPlayer extends AudioPlayer {
   }
 
   @override
-  Future<void> play(Source source, {
+  Future<void> play(
+    Source source, {
     double? volume,
     AudioContext? ctx,
     Duration? position,
@@ -182,34 +181,52 @@ void main() {
     }
 
     // Mock Method Channels của audioplayers và flutter_tts để tránh lỗi MissingPluginException
-    const MethodChannel('xyz.luan/audioplayers').setMockMethodCallHandler((methodCall) async {
+    const MethodChannel('xyz.luan/audioplayers').setMockMethodCallHandler((
+      methodCall,
+    ) async {
       if (methodCall.method == 'create') {
         return null;
       }
       return null;
     });
-    const MethodChannel('xyz.luan/audioplayers/global').setMockMethodCallHandler((methodCall) async {
+    const MethodChannel(
+      'xyz.luan/audioplayers/global',
+    ).setMockMethodCallHandler((methodCall) async {
       return null;
     });
-    const MethodChannel('flutter_tts').setMockMethodCallHandler((methodCall) async {
+    const MethodChannel('flutter_tts').setMockMethodCallHandler((
+      methodCall,
+    ) async {
       return null;
     });
   });
 
   group('TTS Voice-over 13 ULTIMATE TESTs & Core Logic', () {
-    test('1. Graceful Fail-over (OpenAI 429 -> Native) - Removed Fallback', () async {
-      final mockDio = MockDio()..shouldThrow = true;
-      final mockTts = MockFlutterTts();
-      final mockPlayer = MockAudioPlayer();
+    test(
+      '1. Graceful Fail-over (OpenAI 429 -> Native) - Removed Fallback',
+      () async {
+        final mockDio = MockDio()..shouldThrow = true;
+        final mockTts = MockFlutterTts();
+        final mockPlayer = MockAudioPlayer();
 
-      final nativeImpl = NativeTtsImpl(tts: mockTts);
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+        final nativeImpl = NativeTtsImpl(tts: mockTts);
+        final openAiImpl = OpenAiTtsImpl(
+          dio: mockDio,
+          player: mockPlayer,
+          prefs: prefs,
+          nativeFallback: nativeImpl,
+        );
 
-      await openAiImpl.speak('Test speech fallback', durationMs: 2000, videoPlaybackSpeed: 1.0);
+        await openAiImpl.speak(
+          'Test speech fallback',
+          durationMs: 2000,
+          videoPlaybackSpeed: 1.0,
+        );
 
-      // Vì đã bỏ fallback theo yêu cầu, Native không được gọi nữa
-      expect(mockTts.lastSpokenText, isNull);
-    });
+        // Vì đã bỏ fallback theo yêu cầu, Native không được gọi nữa
+        expect(mockTts.lastSpokenText, isNull);
+      },
+    );
 
     test('2. Engine Warm-up (init called once)', () async {
       final mockTts = MockFlutterTts();
@@ -217,8 +234,17 @@ void main() {
       final facade = TtsServiceFacade(
         prefs: prefs,
         nativeTts: nativeImpl,
-        openAiTts: OpenAiTtsImpl(dio: MockDio(), player: MockAudioPlayer(), prefs: prefs, nativeFallback: nativeImpl),
-        edgeTts: EdgeTtsImpl(dio: MockDio(), player: MockAudioPlayer(), prefs: prefs),
+        openAiTts: OpenAiTtsImpl(
+          dio: MockDio(),
+          player: MockAudioPlayer(),
+          prefs: prefs,
+          nativeFallback: nativeImpl,
+        ),
+        edgeTts: EdgeTtsImpl(
+          dio: MockDio(),
+          player: MockAudioPlayer(),
+          prefs: prefs,
+        ),
       );
 
       await facade.init();
@@ -231,7 +257,11 @@ void main() {
       final nativeImpl = NativeTtsImpl(tts: mockTts);
 
       final longText = 'A' * 600;
-      await nativeImpl.speak(longText, durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await nativeImpl.speak(
+        longText,
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
 
       expect(mockTts.lastSpokenText?.length, equals(500));
       expect(mockTts.lastSpokenText, equals('A' * 500));
@@ -245,9 +275,18 @@ void main() {
       final mockDio = MockDio();
       final mockPlayer = MockAudioPlayer();
       final nativeImpl = NativeTtsImpl(tts: MockFlutterTts());
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
 
-      await openAiImpl.speak('Hello', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await openAiImpl.speak(
+        'Hello',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
 
       expect(mockDio.lastData, isNotNull);
       final dataMap = mockDio.lastData as Map<String, dynamic>;
@@ -258,15 +297,32 @@ void main() {
       final mockDio = MockDio();
       final mockPlayer = MockAudioPlayer();
       final nativeImpl = NativeTtsImpl(tts: MockFlutterTts());
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
 
       await prefs.setString('tts_api_key', 'test-key');
       await prefs.setString('tts_base_url', 'https://api.openai.com/v1');
 
       // Gọi speak 3 lần đồng thời không await
-      final p1 = openAiImpl.speak('First text', durationMs: 2000, videoPlaybackSpeed: 1.0);
-      final p2 = openAiImpl.speak('Second text', durationMs: 2000, videoPlaybackSpeed: 1.0);
-      final p3 = openAiImpl.speak('Third text', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      final p1 = openAiImpl.speak(
+        'First text',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
+      final p2 = openAiImpl.speak(
+        'Second text',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
+      final p3 = openAiImpl.speak(
+        'Third text',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
 
       await Future.wait<void>([p1, p2, p3]);
 
@@ -288,9 +344,18 @@ void main() {
       final mockDio = MockDio();
       final mockPlayer = MockAudioPlayer();
       final nativeImpl = NativeTtsImpl(tts: MockFlutterTts());
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
 
-      await openAiImpl.speak('Hello', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await openAiImpl.speak(
+        'Hello',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
 
       // Base URL phải được sanitize không có double slash
       expect(mockDio.lastUrl, equals('https://proxy.com/v1/audio/speech'));
@@ -302,9 +367,18 @@ void main() {
       final mockDio = MockDio();
       final mockPlayer = MockAudioPlayer();
       final nativeImpl = NativeTtsImpl(tts: MockFlutterTts());
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
 
-      await openAiImpl.speak('Speed check', durationMs: 2000, videoPlaybackSpeed: 2.0);
+      await openAiImpl.speak(
+        'Speed check',
+        durationMs: 2000,
+        videoPlaybackSpeed: 2.0,
+      );
 
       final dataMap = mockDio.lastData as Map<String, dynamic>;
       expect(dataMap['speed'], equals(2.5));
@@ -313,15 +387,24 @@ void main() {
     test('8. Resource Disposal', () async {
       await prefs.setString('tts_api_key', 'test-key');
       await prefs.setString('tts_base_url', 'https://api.openai.com/v1');
-      
+
       final mockDio = MockDio()..delayMs = 100;
       final mockPlayer = MockAudioPlayer();
       final nativeImpl = NativeTtsImpl(tts: MockFlutterTts());
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
 
       // Gọi speak nhưng không await (giả lập đang chạy)
-      final future = openAiImpl.speak('Long request', durationMs: 5000, videoPlaybackSpeed: 1.0);
-      
+      final future = openAiImpl.speak(
+        'Long request',
+        durationMs: 5000,
+        videoPlaybackSpeed: 1.0,
+      );
+
       // Chờ một chút để dio nhận request
       await Future.delayed(const Duration(milliseconds: 50));
 
@@ -342,8 +425,17 @@ void main() {
       final mockPlayer = MockAudioPlayer();
 
       final nativeImpl = NativeTtsImpl(tts: mockTts);
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
-      final edgeTts = EdgeTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
+      final edgeTts = EdgeTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+      );
       final facade = TtsServiceFacade(
         prefs: prefs,
         nativeTts: nativeImpl,
@@ -353,7 +445,11 @@ void main() {
 
       // Trường hợp 1: tts_engine = native
       await prefs.setString('tts_engine', 'native');
-      await facade.speak('Engine test', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await facade.speak(
+        'Engine test',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
       expect(mockTts.lastSpokenText, equals('Engine test'));
 
       // Trường hợp 2: tts_engine = openai
@@ -361,8 +457,12 @@ void main() {
       await prefs.setString('tts_engine', 'openai');
       await prefs.setString('tts_api_key', 'key');
       await prefs.setString('tts_base_url', 'url');
-      await facade.speak('Engine test', durationMs: 2000, videoPlaybackSpeed: 1.0);
-      
+      await facade.speak(
+        'Engine test',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
+
       expect(mockTts.lastSpokenText, isNull); // Không chạy qua native nữa
       expect(mockPlayer.isPlayCalled, isTrue);
     });
@@ -373,8 +473,17 @@ void main() {
       final mockPlayer = MockAudioPlayer();
 
       final nativeImpl = NativeTtsImpl(tts: mockTts);
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
-      final edgeTts = EdgeTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
+      final edgeTts = EdgeTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+      );
       final facade = TtsServiceFacade(
         prefs: prefs,
         nativeTts: nativeImpl,
@@ -385,7 +494,11 @@ void main() {
       await prefs.setString('tts_engine', 'openai');
       await prefs.setString('tts_api_key', ''); // Rỗng API key
 
-      await facade.speak('Fallback text', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await facade.speak(
+        'Fallback text',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
 
       // Không chuyển sang Native đọc nữa vì đã gỡ bỏ fallback
       expect(mockTts.lastSpokenText, isNull);
@@ -398,9 +511,18 @@ void main() {
       final mockDio = MockDio();
       final mockPlayer = MockAudioPlayer();
       final nativeImpl = NativeTtsImpl(tts: MockFlutterTts());
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
 
-      await openAiImpl.speak('Hello POST', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await openAiImpl.speak(
+        'Hello POST',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
 
       expect(mockPlayer.lastSource, isA<BytesSource>());
       final bytesSource = mockPlayer.lastSource as BytesSource;
@@ -411,7 +533,12 @@ void main() {
       final mockTts = MockFlutterTts()..isLanguageAvailableResult = false;
       final nativeImpl = NativeTtsImpl(tts: mockTts);
 
-      await nativeImpl.speak('Xin chào', durationMs: 2000, videoPlaybackSpeed: 1.0, languageCode: 'vi-VN');
+      await nativeImpl.speak(
+        'Xin chào',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+        languageCode: 'vi-VN',
+      );
 
       // Do tiếng Việt không khả dụng, phải fallback sang en-US hoặc default
       expect(mockTts.lastLanguage, equals('en-US'));
@@ -422,11 +549,19 @@ void main() {
       final mockTts = MockFlutterTts();
       final nativeImpl = NativeTtsImpl(tts: mockTts);
 
-      await nativeImpl.speak('<i>Hello</i> World!', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await nativeImpl.speak(
+        '<i>Hello</i> World!',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
       expect(mockTts.lastSpokenText, equals('Hello World!'));
 
       mockTts.lastSpokenText = null;
-      await nativeImpl.speak('♪ Music ♪', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await nativeImpl.speak(
+        '♪ Music ♪',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
       expect(mockTts.lastSpokenText, equals('Music'));
     });
 
@@ -436,11 +571,20 @@ void main() {
       final mockDio = MockDio();
       final mockPlayer = MockAudioPlayer();
       final nativeImpl = NativeTtsImpl(tts: MockFlutterTts());
-      final openAiImpl = OpenAiTtsImpl(dio: mockDio, player: mockPlayer, prefs: prefs, nativeFallback: nativeImpl);
+      final openAiImpl = OpenAiTtsImpl(
+        dio: mockDio,
+        player: mockPlayer,
+        prefs: prefs,
+        nativeFallback: nativeImpl,
+      );
 
       // Một câu thoại dài 10 từ (khoảng 4560ms ở tốc độ 1.0 với độ nhạy tăng 20%)
       // Nếu thời gian hiển thị là 2000ms, tốc độ được tính toán là: 4560 / 2000 = 2.28x
-      await openAiImpl.speak('One two three four five six seven eight nine ten', durationMs: 2000, videoPlaybackSpeed: 1.0);
+      await openAiImpl.speak(
+        'One two three four five six seven eight nine ten',
+        durationMs: 2000,
+        videoPlaybackSpeed: 1.0,
+      );
 
       expect(mockDio.lastData, isNotNull);
       final dataMap = mockDio.lastData as Map<String, dynamic>;

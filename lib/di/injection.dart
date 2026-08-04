@@ -32,10 +32,14 @@ final getIt = GetIt.instance;
 
 Future<void> setupInjection() async {
   // Network
-  getIt.registerLazySingleton<Dio>(() => Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 15),
-  )));
+  getIt.registerLazySingleton<Dio>(
+    () => Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ),
+    ),
+  );
 
   // Repositories
   final prefs = await SharedPreferences.getInstance();
@@ -49,12 +53,9 @@ Future<void> setupInjection() async {
     prefs: prefs,
     nativeFallback: nativeTts,
   );
-  final edgeTts = EdgeTtsImpl(
-    dio: getIt<Dio>(),
-    prefs: prefs,
-  );
+  final edgeTts = EdgeTtsImpl(dio: getIt<Dio>(), prefs: prefs);
   getIt.registerSingleton<EdgeTtsImpl>(edgeTts);
-  
+
   getIt.registerLazySingleton<TtsService>(
     () => TtsServiceFacade(
       prefs: prefs,
@@ -64,11 +65,19 @@ Future<void> setupInjection() async {
     ),
   );
 
-  getIt.registerLazySingleton<HistoryRepository>(() => HistoryRepositoryImpl(getIt(), getIt()));
-  getIt.registerLazySingleton<SubtitleRepository>(() => SubtitleRepositoryImpl(getIt()));
-  getIt.registerLazySingleton<ExternalSubtitleRepository>(() => ExternalSubtitleRepository(getIt()));
-  getIt.registerLazySingleton<TranslationService>(() => TranslationService(getIt()));
-  
+  getIt.registerLazySingleton<HistoryRepository>(
+    () => HistoryRepositoryImpl(getIt(), getIt()),
+  );
+  getIt.registerLazySingleton<SubtitleRepository>(
+    () => SubtitleRepositoryImpl(getIt()),
+  );
+  getIt.registerLazySingleton<ExternalSubtitleRepository>(
+    () => ExternalSubtitleRepository(getIt()),
+  );
+  getIt.registerLazySingleton<TranslationService>(
+    () => TranslationService(getIt()),
+  );
+
   final webdavService = WebDAVService();
   webdavService.init(
     prefs.getString('cinestream_webdav_url') ?? '',
@@ -77,17 +86,16 @@ Future<void> setupInjection() async {
     folderPath: prefs.getString('cinestream_webdav_path') ?? '/CineStream',
   );
   getIt.registerLazySingleton<WebDAVService>(() => webdavService);
-  
+
   getIt.registerLazySingleton<LogService>(() => LogService());
-  
+
   // Sources
   getIt.registerLazySingleton(() => KissKhApi(getIt()));
   getIt.registerLazySingleton(() => PhimMoiChillApi(getIt()));
-  
+
   // final kissKhSource = KissKhSource(getIt());
   final cinemetaSource = CinemetaSource(getIt());
   final phimMoiChillSource = PhimMoiChillSource(getIt());
-
 
   final sourceManager = SourceManager(
     prefs: prefs,

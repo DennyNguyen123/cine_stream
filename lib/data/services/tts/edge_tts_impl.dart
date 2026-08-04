@@ -16,7 +16,7 @@ class EdgeTtsImpl implements TtsService {
   String? _cachedToken;
   String? _cachedCookie;
   DateTime? _tokenTime;
-  
+
   bool _isDisposed = false;
   Future<void> _lock = Future.value();
   CancelToken? _cancelToken;
@@ -35,13 +35,10 @@ class EdgeTtsImpl implements TtsService {
   static const String _userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-  EdgeTtsImpl({
-    Dio? dio,
-    AudioPlayer? player,
-    required SharedPreferences prefs,
-  })  : _dio = dio ?? Dio(),
-        _player = player ?? AudioPlayer(),
-        _prefs = prefs;
+  EdgeTtsImpl({Dio? dio, AudioPlayer? player, required SharedPreferences prefs})
+    : _dio = dio ?? Dio(),
+      _player = player ?? AudioPlayer(),
+      _prefs = prefs;
 
   @override
   Future<void> init() async {
@@ -50,9 +47,7 @@ class EdgeTtsImpl implements TtsService {
         const AudioContext(
           iOS: AudioContextIOS(
             category: AVAudioSessionCategory.playback,
-            options: [
-              AVAudioSessionOptions.mixWithOthers,
-            ],
+            options: [AVAudioSessionOptions.mixWithOthers],
           ),
           android: AudioContextAndroid(
             audioFocus: AndroidAudioFocus.none,
@@ -89,12 +84,12 @@ class EdgeTtsImpl implements TtsService {
       }
 
       final rawCookies = response.headers['set-cookie'] ?? [];
-      final cookieString = rawCookies
-          .map((c) => c.split(';').first)
-          .join('; ');
+      final cookieString = rawCookies.map((c) => c.split(';').first).join('; ');
 
       final html = response.data!;
-      final regExp = RegExp(r'params_AbusePreventionHelper\s*=\s*\[([^,]+),([^,]+),');
+      final regExp = RegExp(
+        r'params_AbusePreventionHelper\s*=\s*\[([^,]+),([^,]+),',
+      );
       final match = regExp.firstMatch(html);
       if (match == null) {
         throw Exception('AbusePreventionHelper parameters not found in HTML');
@@ -104,8 +99,10 @@ class EdgeTtsImpl implements TtsService {
       _cachedToken = match.group(2)?.replaceAll('"', '').trim();
       _cachedCookie = cookieString;
       _tokenTime = now;
-      
-      debugPrint('[EdgeTTS] Got new token: key=$_cachedKey, token=$_cachedToken');
+
+      debugPrint(
+        '[EdgeTTS] Got new token: key=$_cachedKey, token=$_cachedToken',
+      );
     } catch (e) {
       debugPrint('[EdgeTTS] Error getting token: $e');
       rethrow;
@@ -143,17 +140,15 @@ class EdgeTtsImpl implements TtsService {
     }
 
     // Build URL-encoded request body thủ công để đảm bảo định dạng SSML an toàn
-    final body = 'ssml=${Uri.encodeComponent(ssml)}'
+    final body =
+        'ssml=${Uri.encodeComponent(ssml)}'
         '&token=${Uri.encodeComponent(_cachedToken ?? '')}'
         '&key=${Uri.encodeComponent(_cachedKey ?? '')}';
 
     return _dio.post<List<int>>(
       'https://www.bing.com/tfettts?isVertical=1&&IG=1&IID=translator.5023&SFX=1',
       data: body,
-      options: Options(
-        headers: headers,
-        responseType: ResponseType.bytes,
-      ),
+      options: Options(headers: headers, responseType: ResponseType.bytes),
       cancelToken: cancelToken,
     );
   }
@@ -177,7 +172,12 @@ class EdgeTtsImpl implements TtsService {
     _lock = _lock.then((_) async {
       try {
         if (_isDisposed) return;
-        await _executeSpeak(cleanText, durationMs, videoPlaybackSpeed, languageCode);
+        await _executeSpeak(
+          cleanText,
+          durationMs,
+          videoPlaybackSpeed,
+          languageCode,
+        );
       } catch (e, stack) {
         getIt<LogService>().error('Edge TTS speak failed', e, stack);
       } finally {
@@ -207,9 +207,17 @@ class EdgeTtsImpl implements TtsService {
     if (_prefetchCache.containsKey(cacheKey)) return;
 
     try {
-      final bytes = await _generateSpeechBytes(cleanText, durationMs, videoPlaybackSpeed, languageCode, null);
+      final bytes = await _generateSpeechBytes(
+        cleanText,
+        durationMs,
+        videoPlaybackSpeed,
+        languageCode,
+        null,
+      );
       _addToCache(cacheKey, bytes);
-      debugPrint('[EdgeTTS] Prefetched and cached speech for text: "$cleanText"');
+      debugPrint(
+        '[EdgeTTS] Prefetched and cached speech for text: "$cleanText"',
+      );
     } catch (_) {
       // Prefetch fails silently
     }
@@ -229,14 +237,21 @@ class EdgeTtsImpl implements TtsService {
     // Tính toán tốc độ đọc tự động dựa trên độ dài văn bản và thời gian hiển thị
     double speedMultiplier = 1.25; // Nâng tốc độ nền lên thêm 25%
     if (durationMs > 0) {
-      final cleanText = text.replaceAll(RegExp(r'\[.*?\]|\(.*?\)', dotAll: true), '').trim();
-      final wordCount = cleanText.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+      final cleanText = text
+          .replaceAll(RegExp(r'\[.*?\]|\(.*?\)', dotAll: true), '')
+          .trim();
+      final wordCount = cleanText
+          .split(RegExp(r'\s+'))
+          .where((w) => w.isNotEmpty)
+          .length;
       if (wordCount > 0) {
         // Ước lượng thời gian cần thiết (tăng 20% độ nhạy): tối thiểu 456ms cho mỗi từ và 96ms cho mỗi ký tự
         final estimatedMsByWords = wordCount * 456;
         final estimatedMsByChars = cleanText.length * 96;
-        final estimatedMs = estimatedMsByWords > estimatedMsByChars ? estimatedMsByWords : estimatedMsByChars;
-        
+        final estimatedMs = estimatedMsByWords > estimatedMsByChars
+            ? estimatedMsByWords
+            : estimatedMsByChars;
+
         final calculatedMultiplier = estimatedMs / durationMs;
         if (calculatedMultiplier > speedMultiplier) {
           speedMultiplier = calculatedMultiplier;
@@ -254,7 +269,9 @@ class EdgeTtsImpl implements TtsService {
       response = await _sendTtsRequest(text, voice, finalSpeed, cancelToken);
     } on DioException catch (e) {
       if (e.response?.statusCode == 403 || e.response?.statusCode == 429) {
-        debugPrint('[EdgeTTS] Token expired or rate limited (status ${e.response?.statusCode}), retrying...');
+        debugPrint(
+          '[EdgeTTS] Token expired or rate limited (status ${e.response?.statusCode}), retrying...',
+        );
         await _getToken(forceRefresh: true);
         response = await _sendTtsRequest(text, voice, finalSpeed, cancelToken);
       } else {
@@ -263,7 +280,9 @@ class EdgeTtsImpl implements TtsService {
     }
 
     if (response.data == null || response.statusCode != 200) {
-      throw Exception('Failed to fetch TTS from Edge (status ${response.statusCode})');
+      throw Exception(
+        'Failed to fetch TTS from Edge (status ${response.statusCode})',
+      );
     }
 
     final bytes = Uint8List.fromList(response.data!);
@@ -288,7 +307,13 @@ class EdgeTtsImpl implements TtsService {
       bytes = _prefetchCache.remove(cacheKey)!;
       debugPrint('[EdgeTTS] Cache hit for text: "$text"');
     } else {
-      bytes = await _generateSpeechBytes(text, durationMs, videoPlaybackSpeed, languageCode, _cancelToken);
+      bytes = await _generateSpeechBytes(
+        text,
+        durationMs,
+        videoPlaybackSpeed,
+        languageCode,
+        _cancelToken,
+      );
     }
 
     if (_isDisposed) return;

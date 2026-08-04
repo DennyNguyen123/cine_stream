@@ -65,20 +65,21 @@ class _TvControlsState extends State<TvControls> {
     _nextEpNode.dispose();
     super.dispose();
   }
+
   String _formatDuration(Duration d) {
-    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
     String twoDigitMinutes = twoDigits(d.inMinutes.remainder(60));
     String twoDigitSeconds = twoDigits(d.inSeconds.remainder(60));
     if (d.inHours > 0) {
-      return "${d.inHours}:$twoDigitMinutes:$twoDigitSeconds";
+      return '${d.inHours}:$twoDigitMinutes:$twoDigitSeconds';
     }
-    return "$twoDigitMinutes:$twoDigitSeconds";
+    return '$twoDigitMinutes:$twoDigitSeconds';
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black.withValues(alpha:0.6),
+      color: Colors.black.withValues(alpha: 0.6),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -91,13 +92,21 @@ class _TvControlsState extends State<TvControls> {
                 Expanded(
                   child: Row(
                     children: [
-                      _buildIconButton(Icons.arrow_back, widget.onBack, downFocusNode: _playPauseNode),
+                      _buildIconButton(
+                        Icons.arrow_back,
+                        widget.onBack,
+                        downFocusNode: _playPauseNode,
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: MarqueeText(
                           text: widget.title,
                           isFocused: true,
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -105,24 +114,48 @@ class _TvControlsState extends State<TvControls> {
                 ),
                 Row(
                   children: [
-                    _buildIconButton(Icons.list, widget.onEpisodes, downFocusNode: _playPauseNode),
-                    const SizedBox(width: 16),
-                    _buildIconButton(Icons.dns, widget.onServerToggle, downFocusNode: _playPauseNode),
-                    const SizedBox(width: 16),
-                    _buildIconButton(Icons.closed_caption, widget.onSubtitleToggle, downFocusNode: _playPauseNode),
-                    const SizedBox(width: 16),
                     _buildIconButton(
-                      widget.isVoiceOverEnabled ? Icons.record_voice_over : Icons.voice_over_off,
-                      widget.onVoiceOverToggle,
+                      Icons.list,
+                      widget.onEpisodes,
                       downFocusNode: _playPauseNode,
-                      color: widget.isVoiceOverEnabled ? Colors.blueAccent : null,
                     ),
                     const SizedBox(width: 16),
-                    _buildIconButton(Icons.tune, widget.onVolumeMixer, downFocusNode: _playPauseNode),
+                    _buildIconButton(
+                      Icons.dns,
+                      widget.onServerToggle,
+                      downFocusNode: _playPauseNode,
+                    ),
                     const SizedBox(width: 16),
-                    _buildIconButton(Icons.settings, widget.onSettings, downFocusNode: _playPauseNode),
+                    _buildIconButton(
+                      Icons.closed_caption,
+                      widget.onSubtitleToggle,
+                      downFocusNode: _playPauseNode,
+                    ),
+                    const SizedBox(width: 16),
+                    _buildIconButton(
+                      widget.isVoiceOverEnabled
+                          ? Icons.record_voice_over
+                          : Icons.voice_over_off,
+                      widget.onVoiceOverToggle,
+                      downFocusNode: _playPauseNode,
+                      color: widget.isVoiceOverEnabled
+                          ? Colors.blueAccent
+                          : null,
+                    ),
+                    const SizedBox(width: 16),
+                    _buildIconButton(
+                      Icons.tune,
+                      widget.onVolumeMixer,
+                      downFocusNode: _playPauseNode,
+                    ),
+                    const SizedBox(width: 16),
+                    _buildIconButton(
+                      Icons.settings,
+                      widget.onSettings,
+                      downFocusNode: _playPauseNode,
+                    ),
                   ],
-                )
+                ),
               ],
             ),
           ),
@@ -130,45 +163,49 @@ class _TvControlsState extends State<TvControls> {
           // Center Controls
           Expanded(
             child: Center(
-              child: widget.isBuffering 
-                ? const CircularProgressIndicator(color: AppColors.primary)
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (widget.onPrevEpisode != null) ...[
+              child: widget.isBuffering
+                  ? const CircularProgressIndicator(color: AppColors.primary)
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (widget.onPrevEpisode != null) ...[
+                          _buildIconButton(
+                            Icons.skip_previous,
+                            widget.onPrevEpisode!,
+                            size: 48,
+                            key: const ValueKey('prev_ep'),
+                            focusNode: _prevEpNode,
+                            rightFocusNode: _playPauseNode,
+                          ),
+                          const SizedBox(width: 32),
+                        ],
                         _buildIconButton(
-                          Icons.skip_previous, 
-                          widget.onPrevEpisode!, 
-                          size: 48, 
-                          key: const ValueKey('prev_ep'),
-                          focusNode: _prevEpNode,
-                          rightFocusNode: _playPauseNode,
+                          widget.isPlaying ? Icons.pause : Icons.play_arrow,
+                          widget.onPlayPause,
+                          size: 64,
+                          autoFocus: true,
+                          key: const ValueKey('play_pause'),
+                          focusNode: _playPauseNode,
+                          leftFocusNode: widget.onPrevEpisode != null
+                              ? _prevEpNode
+                              : null,
+                          rightFocusNode: widget.onNextEpisode != null
+                              ? _nextEpNode
+                              : null,
                         ),
-                        const SizedBox(width: 32),
+                        if (widget.onNextEpisode != null) ...[
+                          const SizedBox(width: 32),
+                          _buildIconButton(
+                            Icons.skip_next,
+                            widget.onNextEpisode!,
+                            size: 48,
+                            key: const ValueKey('next_ep'),
+                            focusNode: _nextEpNode,
+                            leftFocusNode: _playPauseNode,
+                          ),
+                        ],
                       ],
-                      _buildIconButton(
-                        widget.isPlaying ? Icons.pause : Icons.play_arrow,
-                        widget.onPlayPause,
-                        size: 64,
-                        autoFocus: true,
-                        key: const ValueKey('play_pause'),
-                        focusNode: _playPauseNode,
-                        leftFocusNode: widget.onPrevEpisode != null ? _prevEpNode : null,
-                        rightFocusNode: widget.onNextEpisode != null ? _nextEpNode : null,
-                      ),
-                      if (widget.onNextEpisode != null) ...[
-                        const SizedBox(width: 32),
-                        _buildIconButton(
-                          Icons.skip_next, 
-                          widget.onNextEpisode!, 
-                          size: 48, 
-                          key: const ValueKey('next_ep'),
-                          focusNode: _nextEpNode,
-                          leftFocusNode: _playPauseNode,
-                        ),
-                      ],
-                    ],
-                  ),
+                    ),
             ),
           ),
 
@@ -206,7 +243,18 @@ class _TvControlsState extends State<TvControls> {
     );
   }
 
-  Widget _buildIconButton(IconData icon, VoidCallback onTap, {double size = 32, bool autoFocus = false, Key? key, FocusNode? focusNode, FocusNode? downFocusNode, FocusNode? leftFocusNode, FocusNode? rightFocusNode, Color? color}) {
+  Widget _buildIconButton(
+    IconData icon,
+    VoidCallback onTap, {
+    double size = 32,
+    bool autoFocus = false,
+    Key? key,
+    FocusNode? focusNode,
+    FocusNode? downFocusNode,
+    FocusNode? leftFocusNode,
+    FocusNode? rightFocusNode,
+    Color? color,
+  }) {
     return _TvControlButton(
       key: key,
       icon: icon,
@@ -280,19 +328,23 @@ class _TvControlButtonState extends State<_TvControlButton> {
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter) {
+          if (event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.enter) {
             widget.onTap();
             return KeyEventResult.handled;
           }
-          if (event.logicalKey == LogicalKeyboardKey.arrowDown && widget.downFocusNode != null) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown &&
+              widget.downFocusNode != null) {
             widget.downFocusNode!.requestFocus();
             return KeyEventResult.handled;
           }
-          if (event.logicalKey == LogicalKeyboardKey.arrowLeft && widget.leftFocusNode != null) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+              widget.leftFocusNode != null) {
             widget.leftFocusNode!.requestFocus();
             return KeyEventResult.handled;
           }
-          if (event.logicalKey == LogicalKeyboardKey.arrowRight && widget.rightFocusNode != null) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+              widget.rightFocusNode != null) {
             widget.rightFocusNode!.requestFocus();
             return KeyEventResult.handled;
           }
@@ -303,7 +355,11 @@ class _TvControlButtonState extends State<_TvControlButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          transform: Matrix4.diagonal3Values(_isFocused ? 1.1 : 1.0, _isFocused ? 1.1 : 1.0, 1.0),
+          transform: Matrix4.diagonal3Values(
+            _isFocused ? 1.1 : 1.0,
+            _isFocused ? 1.1 : 1.0,
+            1.0,
+          ),
           transformAlignment: Alignment.center,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -313,13 +369,15 @@ class _TvControlButtonState extends State<_TvControlButton> {
               color: _isFocused ? Colors.white : Colors.transparent,
               width: 2,
             ),
-            boxShadow: _isFocused ? [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.6),
-                blurRadius: 12,
-                spreadRadius: 2,
-              )
-            ] : [],
+            boxShadow: _isFocused
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.6),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                : [],
           ),
           child: Icon(
             widget.icon,
@@ -364,7 +422,8 @@ class _TvSliderState extends State<_TvSlider> {
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.arrowUp && widget.upFocusNode != null) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp &&
+              widget.upFocusNode != null) {
             widget.upFocusNode!.requestFocus();
             return KeyEventResult.handled;
           }
@@ -383,7 +442,10 @@ class _TvSliderState extends State<_TvSlider> {
       },
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: _isFocused ? Colors.white : Colors.transparent, width: 2),
+          border: Border.all(
+            color: _isFocused ? Colors.white : Colors.transparent,
+            width: 2,
+          ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: SliderTheme(
@@ -396,8 +458,15 @@ class _TvSliderState extends State<_TvSlider> {
           ),
           child: ExcludeFocus(
             child: Slider(
-              value: widget.position.inSeconds.toDouble().clamp(0.0, widget.duration.inSeconds.toDouble() > 0 ? widget.duration.inSeconds.toDouble() : 1.0),
-              max: widget.duration.inSeconds.toDouble() > 0 ? widget.duration.inSeconds.toDouble() : 1.0,
+              value: widget.position.inSeconds.toDouble().clamp(
+                0.0,
+                widget.duration.inSeconds.toDouble() > 0
+                    ? widget.duration.inSeconds.toDouble()
+                    : 1.0,
+              ),
+              max: widget.duration.inSeconds.toDouble() > 0
+                  ? widget.duration.inSeconds.toDouble()
+                  : 1.0,
               onChangeStart: widget.onDragStart,
               onChanged: (val) {
                 if (widget.onDragUpdate != null) {

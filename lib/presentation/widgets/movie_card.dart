@@ -3,7 +3,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../domain/entities/movie.dart';
 import '../../../core/theme/app_colors.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'marquee_text.dart';
 
 import '../../../domain/repositories/source_manager.dart';
@@ -49,8 +48,8 @@ class _MovieCardState extends State<MovieCard> {
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
             (event.logicalKey == LogicalKeyboardKey.select ||
-             event.logicalKey == LogicalKeyboardKey.enter ||
-             event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+                event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
           widget.onClick();
           return KeyEventResult.handled;
         }
@@ -70,13 +69,15 @@ class _MovieCardState extends State<MovieCard> {
                 color: _isFocused ? Colors.white : Colors.transparent,
                 width: 3,
               ),
-              boxShadow: _isFocused ? [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha:0.6),
-                  blurRadius: 15,
-                  spreadRadius: 2,
-                )
-              ] : [],
+              boxShadow: _isFocused
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.6),
+                        blurRadius: 15,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : [],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6),
@@ -84,17 +85,19 @@ class _MovieCardState extends State<MovieCard> {
                 fit: StackFit.expand,
                 children: [
                   // Poster
-                  if (widget.movie.thumbnail != null && widget.movie.thumbnail!.isNotEmpty)
+                  if (widget.movie.thumbnail != null &&
+                      widget.movie.thumbnail!.isNotEmpty)
                     CachedNetworkImage(
                       imageUrl: widget.movie.thumbnail!,
                       fit: BoxFit.cover,
                       memCacheWidth: 300,
                       errorWidget: (context, url, error) => _buildFallback(),
-                      placeholder: (context, url) => Container(color: AppColors.surfaceVariant),
+                      placeholder: (context, url) =>
+                          Container(color: AppColors.surfaceVariant),
                     )
                   else
                     _buildFallback(),
-                  
+
                   // Gradient Overlay
                   Container(
                     decoration: BoxDecoration(
@@ -134,11 +137,17 @@ class _MovieCardState extends State<MovieCard> {
                       top: 8,
                       right: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha:0.75),
+                          color: Colors.black.withValues(alpha: 0.75),
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppColors.primary.withValues(alpha:0.8), width: 1),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.8),
+                            width: 1,
+                          ),
                         ),
                         child: const Text(
                           'DUAL SUB',
@@ -173,13 +182,20 @@ class _MovieCardState extends State<MovieCard> {
                           spacing: 4,
                           runSpacing: 4,
                           children: [
-                            if (widget.movie.year != null && widget.movie.year!.isNotEmpty)
+                            if (widget.movie.year != null &&
+                                widget.movie.year!.isNotEmpty)
                               _buildBadge(widget.movie.year!),
-                            if (widget.movie.type != null && widget.movie.type!.isNotEmpty)
-                              _buildBadge(widget.movie.type!, color: AppColors.primary),
-                            if (widget.movie.totalEpisodes != null && widget.movie.totalEpisodes! > 0)
+                            if (widget.movie.type != null &&
+                                widget.movie.type!.isNotEmpty)
+                              _buildBadge(
+                                widget.movie.type!,
+                                color: AppColors.primary,
+                              ),
+                            if (widget.movie.totalEpisodes != null &&
+                                widget.movie.totalEpisodes! > 0)
                               _buildBadge('${widget.movie.totalEpisodes} EPS'),
-                            if (widget.movie.status != null && widget.movie.status!.isNotEmpty)
+                            if (widget.movie.status != null &&
+                                widget.movie.status!.isNotEmpty)
                               _buildBadge(widget.movie.status!),
                           ],
                         ),
@@ -202,7 +218,7 @@ class _MovieCardState extends State<MovieCard> {
         child: Text(
           widget.movie.title.isNotEmpty ? widget.movie.title[0] : '?',
           style: TextStyle(
-            color: Colors.white.withValues(alpha:0.2),
+            color: Colors.white.withValues(alpha: 0.2),
             fontSize: 60,
             fontWeight: FontWeight.bold,
           ),
@@ -212,25 +228,19 @@ class _MovieCardState extends State<MovieCard> {
   }
 
   Widget _buildBadge(String text, {Color color = Colors.white70}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: color.withValues(alpha: 0.5), width: 0.5),
-          ),
-          child: Text(
-            text.toUpperCase(),
-            style: TextStyle(
-              color: color,
-              fontSize: 8,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 0.5),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: 8,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );

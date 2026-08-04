@@ -12,10 +12,9 @@ class NativeTtsImpl implements TtsService {
   Future<void> init() async {
     // Cấu hình iOS Audio Session category để không bị đè tiếng phim
     try {
-      await _tts.setIosAudioCategory(
-        IosTextToSpeechAudioCategory.playback,
-        [IosTextToSpeechAudioCategoryOptions.mixWithOthers],
-      );
+      await _tts.setIosAudioCategory(IosTextToSpeechAudioCategory.playback, [
+        IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+      ]);
     } catch (_) {}
     try {
       await _tts.setLanguage('en-US');
@@ -63,9 +62,13 @@ class NativeTtsImpl implements TtsService {
             if (name == selectedVoiceName) {
               try {
                 if (voice is Map) {
-                  await _tts.setVoice(Map<String, String>.from(voice.map((k, v) => MapEntry(k.toString(), v.toString()))));
+                  await _tts.setVoice(
+                    Map<String, String>.from(
+                      voice.map((k, v) => MapEntry(k.toString(), v.toString())),
+                    ),
+                  );
                 } else {
-                  await _tts.setVoice({"name": name, "locale": ""});
+                  await _tts.setVoice({'name': name, 'locale': ''});
                 }
               } catch (e) {
                 print('[Native TTS] setVoice failed: $e');
@@ -75,7 +78,9 @@ class NativeTtsImpl implements TtsService {
             }
           }
           if (!voiceFound) {
-            print('[Native TTS] Warning: selected voice "$selectedVoiceName" not found in available voices. Falling back to language selection.');
+            print(
+              '[Native TTS] Warning: selected voice "$selectedVoiceName" not found in available voices. Falling back to language selection.',
+            );
             // Fallback sang thiết lập ngôn ngữ nếu không tìm thấy giọng
             String targetLang = languageCode ?? 'en-US';
             try {
@@ -94,7 +99,9 @@ class NativeTtsImpl implements TtsService {
             await _tts.setLanguage('en-US');
           }
         } catch (e) {
-          print('[Native TTS] isLanguageAvailable not supported or failed: $e. Attempting direct setLanguage.');
+          print(
+            '[Native TTS] isLanguageAvailable not supported or failed: $e. Attempting direct setLanguage.',
+          );
           try {
             await _tts.setLanguage(targetLang);
           } catch (_) {}
@@ -165,12 +172,15 @@ class NativeTtsImpl implements TtsService {
       try {
         final List<dynamic>? voices = await _tts.getVoices;
         if (voices != null) {
-          final list = voices.map((v) {
-            if (v is Map) {
-              return (v['name'] ?? v['locale'] ?? '').toString();
-            }
-            return v.toString();
-          }).where((name) => name.isNotEmpty).toList();
+          final list = voices
+              .map((v) {
+                if (v is Map) {
+                  return (v['name'] ?? v['locale'] ?? '').toString();
+                }
+                return v.toString();
+              })
+              .where((name) => name.isNotEmpty)
+              .toList();
           completer.complete(list);
           return;
         }

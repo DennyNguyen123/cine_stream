@@ -18,18 +18,21 @@ class KissKhApi {
     int order = 2,
     String q = '',
   }) async {
-    String url = '$baseUrl/api/DramaList/List?page=$page&type=$type&sub=$sub&country=$country&status=$status&order=$order';
+    String url =
+        '$baseUrl/api/DramaList/List?page=$page&type=$type&sub=$sub&country=$country&status=$status&order=$order';
     if (q.isNotEmpty) {
       url = '$baseUrl/api/DramaList/Search?q=$q&type=$type';
     }
-    
+
     final response = await _dio.get(url);
     final data = (q.isNotEmpty ? response.data : response.data['data']) as List;
     return data.map((e) => KissKhMovieJson.fromJson(e)).toList();
   }
 
   Future<List<KissKhMovieJson>> search(String query) async {
-    final response = await _dio.get('$baseUrl/api/DramaList/Search?q=$query&type=0');
+    final response = await _dio.get(
+      '$baseUrl/api/DramaList/Search?q=$query&type=0',
+    );
     final data = response.data as List;
     return data.map((e) => KissKhMovieJson.fromJson(e)).toList();
   }
@@ -47,15 +50,16 @@ class KissKhApi {
         options: Options(
           headers: {
             'Referer': '$baseUrl/',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           },
           responseType: ResponseType.plain,
         ),
       );
-      
+
       final body = response.data.toString().trim();
       String decodedJson = '';
-      
+
       if (body.startsWith('{')) {
         decodedJson = body;
       } else {
@@ -66,7 +70,7 @@ class KissKhApi {
         final bytes = base64Decode(base64Data);
         decodedJson = utf8.decode(bytes);
       }
-      
+
       final Map<String, dynamic> json = jsonDecode(decodedJson);
       return json['Video'] as String? ?? json['video'] as String?;
     } catch (e) {
@@ -75,18 +79,22 @@ class KissKhApi {
     }
   }
 
-  Future<List<KissKhSubtitleJson>> getSubtitles(int episodeId, String subKey) async {
+  Future<List<KissKhSubtitleJson>> getSubtitles(
+    int episodeId,
+    String subKey,
+  ) async {
     try {
       final response = await _dio.get(
         '$baseUrl/api/Sub/$episodeId?kkey=$subKey',
         options: Options(
           headers: {
             'Referer': '$baseUrl/',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          }
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
         ),
       );
-      
+
       if (response.data is List) {
         final data = response.data as List;
         return data.map((e) => KissKhSubtitleJson.fromJson(e)).toList();
@@ -98,4 +106,3 @@ class KissKhApi {
     }
   }
 }
-

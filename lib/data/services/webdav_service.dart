@@ -6,16 +6,21 @@ class WebDAVService {
   webdav.Client? _client;
   String _syncFolder = '/CineStream';
 
-  void init(String url, String username, String password, {String? folderPath}) {
+  void init(
+    String url,
+    String username,
+    String password, {
+    String? folderPath,
+  }) {
     if (url.isEmpty || username.isEmpty || password.isEmpty) return;
-    
+
     if (folderPath != null && folderPath.isNotEmpty) {
       _syncFolder = folderPath.startsWith('/') ? folderPath : '/$folderPath';
       if (_syncFolder.endsWith('/')) {
         _syncFolder = _syncFolder.substring(0, _syncFolder.length - 1);
       }
     }
-    
+
     _client = webdav.newClient(
       url,
       user: username,
@@ -26,7 +31,7 @@ class WebDAVService {
     _client?.setSendTimeout(8000);
     _client?.setReceiveTimeout(8000);
   }
-  
+
   bool get isConfigured => _client != null;
 
   Future<bool> ping() async {
@@ -72,7 +77,10 @@ class WebDAVService {
       await _ensureFolderExists();
       final str = jsonEncode(data);
       final bytes = utf8.encode(str);
-      await _client!.write('$_syncFolder/history.json', Uint8List.fromList(bytes));
+      await _client!.write(
+        '$_syncFolder/history.json',
+        Uint8List.fromList(bytes),
+      );
       return true;
     } catch (e) {
       return false;

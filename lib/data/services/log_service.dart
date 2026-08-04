@@ -16,7 +16,8 @@ class LogService {
 
   void error(String message, [dynamic error, StackTrace? stack]) {
     final time = DateTime.now().toIso8601String();
-    final logMessage = '[$time] ERROR: $message\n${error ?? ''}\n${stack ?? ''}';
+    final logMessage =
+        '[$time] ERROR: $message\n${error ?? ''}\n${stack ?? ''}';
     debugPrint(logMessage);
     _logs.add(logMessage);
     if (_logs.length > 500) _logs.removeAt(0);
@@ -25,31 +26,37 @@ class LogService {
 
   Future<void> _uploadLogsToWebDAV() async {
     try {
-       final webdav = getIt<WebDAVService>();
-       if (webdav.isConfigured) {
-           final os = Platform.operatingSystem;
-           final deviceName = Platform.localHostname.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
-           final fileName = '${os}_${deviceName}_logs.txt';
-           await webdav.uploadLog(_logs.join('\n'), fileName);
-       }
+      final webdav = getIt<WebDAVService>();
+      if (webdav.isConfigured) {
+        final os = Platform.operatingSystem;
+        final deviceName = Platform.localHostname.replaceAll(
+          RegExp(r'[^a-zA-Z0-9_\-]'),
+          '_',
+        );
+        final fileName = '${os}_${deviceName}_logs.txt';
+        await webdav.uploadLog(_logs.join('\n'), fileName);
+      }
     } catch (e) {
-       debugPrint('Failed to auto-upload logs: $e');
+      debugPrint('Failed to auto-upload logs: $e');
     }
   }
 
   Future<bool> uploadManual() async {
     try {
-       final webdav = getIt<WebDAVService>();
-       if (webdav.isConfigured) {
-           final os = Platform.operatingSystem;
-           final deviceName = Platform.localHostname.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
-           final fileName = '${os}_${deviceName}_logs.txt';
-           return await webdav.uploadLog(_logs.join('\n'), fileName);
-       }
-       return false;
+      final webdav = getIt<WebDAVService>();
+      if (webdav.isConfigured) {
+        final os = Platform.operatingSystem;
+        final deviceName = Platform.localHostname.replaceAll(
+          RegExp(r'[^a-zA-Z0-9_\-]'),
+          '_',
+        );
+        final fileName = '${os}_${deviceName}_logs.txt';
+        return await webdav.uploadLog(_logs.join('\n'), fileName);
+      }
+      return false;
     } catch (e) {
-       debugPrint('Failed to manually upload logs: $e');
-       return false;
+      debugPrint('Failed to manually upload logs: $e');
+      return false;
     }
   }
 }

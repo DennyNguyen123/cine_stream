@@ -12,21 +12,27 @@ class SubtitleParser {
   static List<SubtitleCue> parse(String content) {
     List<SubtitleCue> cues = [];
     final lines = const LineSplitter().convert(content);
-    
+
     int state = 0; // 0: index or timestamp, 1: text
     String currentTimestamp = '';
     StringBuffer currentText = StringBuffer();
-    
+
     for (String line in lines) {
       String trimmedLine = line.trim();
-      
+
       if (trimmedLine.isEmpty) {
         if (currentTimestamp.isNotEmpty) {
           final times = _parseTimestamp(currentTimestamp);
           if (times != null) {
             String text = currentText.toString().trim();
             String decryptedText = _decryptSubtitleText(text);
-            cues.add(SubtitleCue(startMs: times[0], endMs: times[1], text: decryptedText));
+            cues.add(
+              SubtitleCue(
+                startMs: times[0],
+                endMs: times[1],
+                text: decryptedText,
+              ),
+            );
           }
           currentTimestamp = '';
           currentText.clear();
@@ -49,33 +55,42 @@ class SubtitleParser {
         currentText.write(trimmedLine);
       }
     }
-    
+
     // Add the last block if it wasn't followed by an empty line
     if (currentTimestamp.isNotEmpty) {
       final times = _parseTimestamp(currentTimestamp);
       if (times != null) {
         String text = currentText.toString().trim();
         String decryptedText = _decryptSubtitleText(text);
-        cues.add(SubtitleCue(startMs: times[0], endMs: times[1], text: decryptedText));
+        cues.add(
+          SubtitleCue(startMs: times[0], endMs: times[1], text: decryptedText),
+        );
       }
     }
-    
+
     return cues;
   }
 
   static String _decryptSubtitleText(String encryptedText) {
-    if (encryptedText.contains('-->') || encryptedText.contains('<i') || encryptedText.contains('<b') || encryptedText.contains('<i>')) {
+    if (encryptedText.contains('-->') ||
+        encryptedText.contains('<i') ||
+        encryptedText.contains('<b') ||
+        encryptedText.contains('<i>')) {
       return encryptedText; // Probably not encrypted
     }
 
     try {
-      final decodedBase64 = base64Decode(encryptedText.replaceAll('\n', '').replaceAll('\r', ''));
+      final decodedBase64 = base64Decode(
+        encryptedText.replaceAll('\n', '').replaceAll('\r', ''),
+      );
       for (var pair in _knownKeys) {
         try {
           final key = Key.fromUtf8(pair[0]);
           final iv = IV.fromUtf8(pair[1]);
-          final encrypter = Encrypter(AES(key, mode: AESMode.cbc, padding: 'PKCS7')); // PKCS7 is same as PKCS5
-          
+          final encrypter = Encrypter(
+            AES(key, mode: AESMode.cbc, padding: 'PKCS7'),
+          ); // PKCS7 is same as PKCS5
+
           final decrypted = encrypter.decrypt(Encrypted(decodedBase64), iv: iv);
           return decrypted;
         } catch (e) {
@@ -85,7 +100,7 @@ class SubtitleParser {
     } catch (e) {
       return encryptedText;
     }
-    
+
     return encryptedText;
   }
 

@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/movie.dart';
 import '../../domain/entities/movie_detail.dart';
 import '../../domain/entities/episode.dart';
-import '../../core/utils/stream_info_cache.dart';
 import '../../core/errors/stream_extraction_exception.dart';
 import 'webview_extractor_screen.dart';
 import '../../domain/entities/stream_info.dart';
@@ -30,7 +29,7 @@ class DetailScreen extends StatefulWidget {
 
 class _DetailScreenState extends State<DetailScreen> {
   static const int _episodesPerPage = 50;
-  
+
   final ScrollController _seasonsScrollController = ScrollController();
   final ScrollController _pagesScrollController = ScrollController();
   final ScrollController _episodesScrollController = ScrollController();
@@ -80,19 +79,22 @@ class _DetailScreenState extends State<DetailScreen> {
   List<FocusNode> _getAvailableRowNodes(MovieDetail detail) {
     List<FocusNode> nodes = [_backButtonNode, _playButtonNode];
     if (detail.servers.isNotEmpty) nodes.add(_firstServerNode);
-    
+
     final seasons = detail.episodes.map((e) => e.season).toSet().toList();
     if (seasons.length > 1) nodes.add(_firstSeasonNode);
-    
-    final selectedSeason = _selectedSeason ?? (seasons.isNotEmpty ? seasons.first : null);
+
+    final selectedSeason =
+        _selectedSeason ?? (seasons.isNotEmpty ? seasons.first : null);
     if (selectedSeason != null) {
-      final seasonEpisodes = detail.episodes.where((e) => e.season == selectedSeason).toList();
+      final seasonEpisodes = detail.episodes
+          .where((e) => e.season == selectedSeason)
+          .toList();
       final int totalPages = (seasonEpisodes.length / _episodesPerPage).ceil();
       if (totalPages > 1) nodes.add(_firstPageNode);
     }
-    
+
     if (detail.episodes.isNotEmpty) nodes.add(_firstEpisodeNode);
-    
+
     return nodes;
   }
 
@@ -162,7 +164,10 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Future<void> _loadHistory() async {
     final sourceId = getIt<SourceManager>().activeSourceId;
-    final history = await getIt<HistoryRepository>().getHistoryForMovie(widget.movie.id, sourceId);
+    final history = await getIt<HistoryRepository>().getHistoryForMovie(
+      widget.movie.id,
+      sourceId,
+    );
     if (mounted) {
       setState(() {
         _historyItem = history;
@@ -180,17 +185,21 @@ class _DetailScreenState extends State<DetailScreen> {
 
   String _getContinueWatchingText(MovieDetail detail) {
     if (_historyItem == null) return 'Play Movie';
-    
+
     String epText = 'Ep ${_historyItem!.episodeNumber.toInt()}';
     try {
-      final ep = detail.episodes.firstWhere((e) => e.id == _historyItem!.episodeId);
-      final hasMultipleSeasons = detail.episodes.map((e) => e.season).toSet().length > 1;
+      final ep = detail.episodes.firstWhere(
+        (e) => e.id == _historyItem!.episodeId,
+      );
+      final hasMultipleSeasons =
+          detail.episodes.map((e) => e.season).toSet().length > 1;
       epText = ep.title ?? 'Ep ${ep.number.toInt()}';
-      if (hasMultipleSeasons && !epText.toUpperCase().startsWith('S${ep.season}')) {
+      if (hasMultipleSeasons &&
+          !epText.toUpperCase().startsWith('S${ep.season}')) {
         epText = 'S${ep.season} - $epText';
       }
     } catch (_) {}
-    
+
     if (detail.title == epText || detail.type == 'movie') {
       if (_historyItem!.durationMs > 0) {
         return 'Continue Watching (${_formatDuration(_historyItem!.positionMs)} / ${_formatDuration(_historyItem!.durationMs)})';
@@ -199,7 +208,7 @@ class _DetailScreenState extends State<DetailScreen> {
       }
       return 'Continue Watching';
     }
-    
+
     if (_historyItem!.durationMs > 0) {
       return 'Continue Watching ($epText - ${_formatDuration(_historyItem!.positionMs)} / ${_formatDuration(_historyItem!.durationMs)})';
     } else if (_historyItem!.positionMs > 0) {
@@ -221,7 +230,9 @@ class _DetailScreenState extends State<DetailScreen> {
           backgroundColor: AppColors.background,
           body: BlocBuilder<DetailCubit, DetailState>(
             builder: (context, state) {
-              if (state is DetailLoading || state is DetailInitial || !_isHistoryLoaded) {
+              if (state is DetailLoading ||
+                  state is DetailInitial ||
+                  !_isHistoryLoaded) {
                 return const Center(child: CircularProgressIndicator());
               } else if (state is DetailError) {
                 return Center(
@@ -239,21 +250,31 @@ class _DetailScreenState extends State<DetailScreen> {
                 // Initialize Pagination
                 if (!_isPaginationInitialized && detail.episodes.isNotEmpty) {
                   _isPaginationInitialized = true;
-                  
-                  final seasons = detail.episodes.map((e) => e.season).toSet().toList()..sort();
-                  
+
+                  final seasons =
+                      detail.episodes.map((e) => e.season).toSet().toList()
+                        ..sort();
+
                   if (_historyItem != null) {
-                    final historyEpIndex = detail.episodes.indexWhere((e) => e.id == _historyItem!.episodeId);
+                    final historyEpIndex = detail.episodes.indexWhere(
+                      (e) => e.id == _historyItem!.episodeId,
+                    );
                     if (historyEpIndex != -1) {
-                       _selectedSeason = detail.episodes[historyEpIndex].season;
+                      _selectedSeason = detail.episodes[historyEpIndex].season;
                     }
                   }
-                  
+
                   _selectedSeason ??= seasons.first;
-                  
-                  final seasonEpisodes = detail.episodes.where((e) => e.season == _selectedSeason).toList()..sort((a, b) => a.number.compareTo(b.number));
+
+                  final seasonEpisodes =
+                      detail.episodes
+                          .where((e) => e.season == _selectedSeason)
+                          .toList()
+                        ..sort((a, b) => a.number.compareTo(b.number));
                   if (_historyItem != null) {
-                    final epIndexInSeason = seasonEpisodes.indexWhere((e) => e.id == _historyItem!.episodeId);
+                    final epIndexInSeason = seasonEpisodes.indexWhere(
+                      (e) => e.id == _historyItem!.episodeId,
+                    );
                     if (epIndexInSeason != -1) {
                       _selectedPage = epIndexInSeason ~/ _episodesPerPage;
                     }
@@ -308,11 +329,19 @@ class _DetailScreenState extends State<DetailScreen> {
                               focusNode: _backButtonNode,
                               onKeyEvent: (node, event) {
                                 if (event is KeyDownEvent) {
-                                  if (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter) {
+                                  if (event.logicalKey ==
+                                          LogicalKeyboardKey.select ||
+                                      event.logicalKey ==
+                                          LogicalKeyboardKey.enter) {
                                     Navigator.pop(context);
                                     return KeyEventResult.handled;
                                   }
-                                  return _handleRowFocus(_backButtonNode, event, detail, () => Navigator.pop(context));
+                                  return _handleRowFocus(
+                                    _backButtonNode,
+                                    event,
+                                    detail,
+                                    () => Navigator.pop(context),
+                                  );
                                 }
                                 return KeyEventResult.ignored;
                               },
@@ -386,15 +415,23 @@ class _DetailScreenState extends State<DetailScreen> {
                                           .replaceAll('&#x27;', "'")
                                           .replaceAll('&quot;', '"')
                                           .replaceAll('&amp;', '&');
-                                          
+
                                       return Focus(
-                                        onFocusChange: (focused) => setFocusState(() => isFocused = focused),
+                                        onFocusChange: (focused) =>
+                                            setFocusState(
+                                              () => isFocused = focused,
+                                            ),
                                         onKeyEvent: (node, event) {
                                           if (event is KeyDownEvent &&
-                                              (event.logicalKey == LogicalKeyboardKey.select ||
-                                               event.logicalKey == LogicalKeyboardKey.enter)) {
+                                              (event.logicalKey ==
+                                                      LogicalKeyboardKey
+                                                          .select ||
+                                                  event.logicalKey ==
+                                                      LogicalKeyboardKey
+                                                          .enter)) {
                                             setState(() {
-                                              _isDescExpanded = !_isDescExpanded;
+                                              _isDescExpanded =
+                                                  !_isDescExpanded;
                                             });
                                             return KeyEventResult.handled;
                                           }
@@ -403,26 +440,42 @@ class _DetailScreenState extends State<DetailScreen> {
                                         child: GestureDetector(
                                           onTap: () {
                                             setState(() {
-                                              _isDescExpanded = !_isDescExpanded;
+                                              _isDescExpanded =
+                                                  !_isDescExpanded;
                                             });
                                           },
                                           child: AnimatedContainer(
-                                            duration: const Duration(milliseconds: 200),
-                                            padding: EdgeInsets.all(isFocused ? 8 : 0),
+                                            duration: const Duration(
+                                              milliseconds: 200,
+                                            ),
+                                            padding: EdgeInsets.all(
+                                              isFocused ? 8 : 0,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: isFocused ? Colors.white12 : Colors.transparent,
-                                              borderRadius: BorderRadius.circular(8),
+                                              color: isFocused
+                                                  ? Colors.white12
+                                                  : Colors.transparent,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                               border: Border.all(
-                                                color: isFocused ? Colors.white30 : Colors.transparent,
+                                                color: isFocused
+                                                    ? Colors.white30
+                                                    : Colors.transparent,
                                                 width: 1,
                                               ),
                                             ),
                                             child: Text(
                                               cleanDesc,
-                                              maxLines: _isDescExpanded ? null : 4,
-                                              overflow: _isDescExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                                              maxLines: _isDescExpanded
+                                                  ? null
+                                                  : 4,
+                                              overflow: _isDescExpanded
+                                                  ? TextOverflow.visible
+                                                  : TextOverflow.ellipsis,
                                               style: TextStyle(
-                                                color: isFocused ? Colors.white : Colors.white70,
+                                                color: isFocused
+                                                    ? Colors.white
+                                                    : Colors.white70,
                                                 fontSize: 16,
                                                 height: 1.5,
                                               ),
@@ -430,16 +483,16 @@ class _DetailScreenState extends State<DetailScreen> {
                                           ),
                                         ),
                                       );
-                                    }
+                                    },
                                   );
-                                }
+                                },
                               ),
                             ),
                             const SizedBox(height: 32),
 
                             // Play Button
                             Builder(
-                                builder: (context) {
+                              builder: (context) {
                                 bool isFocused = false;
                                 return StatefulBuilder(
                                   builder: (context, setState) {
@@ -454,7 +507,8 @@ class _DetailScreenState extends State<DetailScreen> {
                                             _playButtonNode,
                                             event,
                                             detail,
-                                            () => _handlePlayNow(context, detail),
+                                            () =>
+                                                _handlePlayNow(context, detail),
                                           );
                                         }
                                         return KeyEventResult.ignored;
@@ -477,21 +531,36 @@ class _DetailScreenState extends State<DetailScreen> {
                                             vertical: isMobile ? 12 : 16,
                                           ),
                                           decoration: BoxDecoration(
-                                            gradient: isFocused ? const LinearGradient(
-                                              colors: [AppColors.primary, Color(0xFFFF5252)],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ) : const LinearGradient(
-                                              colors: [AppColors.primary, AppColors.primary],
+                                            gradient: isFocused
+                                                ? const LinearGradient(
+                                                    colors: [
+                                                      AppColors.primary,
+                                                      Color(0xFFFF5252),
+                                                    ],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  )
+                                                : const LinearGradient(
+                                                    colors: [
+                                                      AppColors.primary,
+                                                      AppColors.primary,
+                                                    ],
+                                                  ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
                                             ),
-                                            borderRadius: BorderRadius.circular(8),
-                                            boxShadow: isFocused ? [
-                                              BoxShadow(
-                                                color: AppColors.primary.withValues(alpha: 0.8),
-                                                blurRadius: 20,
-                                                spreadRadius: 4,
-                                              )
-                                            ] : [],
+                                            boxShadow: isFocused
+                                                ? [
+                                                    BoxShadow(
+                                                      color: AppColors.primary
+                                                          .withValues(
+                                                            alpha: 0.8,
+                                                          ),
+                                                      blurRadius: 20,
+                                                      spreadRadius: 4,
+                                                    ),
+                                                  ]
+                                                : [],
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
@@ -506,11 +575,16 @@ class _DetailScreenState extends State<DetailScreen> {
                                               const SizedBox(width: 8),
                                               Flexible(
                                                 child: Text(
-                                                  _getContinueWatchingText(detail),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  _getContinueWatchingText(
+                                                    detail,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   maxLines: 1,
                                                   style: TextStyle(
-                                                    fontSize: isMobile ? 16 : 18,
+                                                    fontSize: isMobile
+                                                        ? 16
+                                                        : 18,
                                                     fontWeight: FontWeight.bold,
                                                     color: Colors.white,
                                                   ),
@@ -558,7 +632,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                           return StatefulBuilder(
                                             builder: (context, setFocusState) {
                                               return Focus(
-                                                focusNode: index == 0 ? _firstServerNode : null,
+                                                focusNode: index == 0
+                                                    ? _firstServerNode
+                                                    : null,
                                                 onFocusChange: (focused) =>
                                                     setFocusState(
                                                       () => isFocused = focused,
@@ -571,7 +647,8 @@ class _DetailScreenState extends State<DetailScreen> {
                                                       detail,
                                                       () {
                                                         setState(() {
-                                                          _selectedServerId = server.id;
+                                                          _selectedServerId =
+                                                              server.id;
                                                         });
                                                       },
                                                     );
@@ -586,13 +663,35 @@ class _DetailScreenState extends State<DetailScreen> {
                                                     });
                                                   },
                                                   child: AnimatedContainer(
-                                                    duration: const Duration(milliseconds: 200),
-                                                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: isMobile ? 6 : 8),
+                                                    duration: const Duration(
+                                                      milliseconds: 200,
+                                                    ),
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                          horizontal: isMobile
+                                                              ? 12
+                                                              : 16,
+                                                          vertical: isMobile
+                                                              ? 6
+                                                              : 8,
+                                                        ),
                                                     decoration: BoxDecoration(
-                                                      color: isFocused ? Colors.white : (isSelected ? AppColors.primary : AppColors.surface),
-                                                      borderRadius: BorderRadius.circular(20),
+                                                      color: isFocused
+                                                          ? Colors.white
+                                                          : (isSelected
+                                                                ? AppColors
+                                                                      .primary
+                                                                : AppColors
+                                                                      .surface),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            20,
+                                                          ),
                                                       border: Border.all(
-                                                        color: isFocused ? Colors.white : Colors.transparent,
+                                                        color: isFocused
+                                                            ? Colors.white
+                                                            : Colors
+                                                                  .transparent,
                                                         width: 2,
                                                       ),
                                                     ),
@@ -600,8 +699,16 @@ class _DetailScreenState extends State<DetailScreen> {
                                                       child: Text(
                                                         server.name,
                                                         style: TextStyle(
-                                                          color: isFocused ? AppColors.background : Colors.white,
-                                                          fontWeight: isSelected || isFocused ? FontWeight.bold : FontWeight.normal,
+                                                          color: isFocused
+                                                              ? AppColors
+                                                                    .background
+                                                              : Colors.white,
+                                                          fontWeight:
+                                                              isSelected ||
+                                                                  isFocused
+                                                              ? FontWeight.bold
+                                                              : FontWeight
+                                                                    .normal,
                                                         ),
                                                       ),
                                                     ),
@@ -631,82 +738,133 @@ class _DetailScreenState extends State<DetailScreen> {
                               Builder(
                                 builder: (context) {
                                   // Find seasons
-                                  final seasons = detail.episodes.map((e) => e.season).toSet().toList()..sort();
-                                  
+                                  final seasons =
+                                      detail.episodes
+                                          .map((e) => e.season)
+                                          .toSet()
+                                          .toList()
+                                        ..sort();
+
                                   // Filter episodes by season
-                                  final seasonEpisodes = detail.episodes
-                                      .where((e) => e.season == _selectedSeason)
-                                      .toList()
-                                      ..sort((a, b) => a.number.compareTo(b.number));
-                                      
+                                  final seasonEpisodes =
+                                      detail.episodes
+                                          .where(
+                                            (e) => e.season == _selectedSeason,
+                                          )
+                                          .toList()
+                                        ..sort(
+                                          (a, b) =>
+                                              a.number.compareTo(b.number),
+                                        );
+
                                   // Pagination
-                                  final int totalPages = (seasonEpisodes.length / _episodesPerPage).ceil();
+                                  final int totalPages =
+                                      (seasonEpisodes.length / _episodesPerPage)
+                                          .ceil();
                                   // Fix _selectedPage out of bounds just in case
-                                  if (_selectedPage >= totalPages) _selectedPage = totalPages > 0 ? totalPages - 1 : 0;
-                                  
+                                  if (_selectedPage >= totalPages)
+                                    _selectedPage = totalPages > 0
+                                        ? totalPages - 1
+                                        : 0;
+
                                   final pageEpisodes = seasonEpisodes
                                       .skip(_selectedPage * _episodesPerPage)
                                       .take(_episodesPerPage)
                                       .toList();
-                                      
+
                                   return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // Season Selector
                                       if (seasons.length > 1) ...[
                                         SizedBox(
                                           height: 48,
                                           child: Scrollbar(
-                                            controller: _seasonsScrollController,
+                                            controller:
+                                                _seasonsScrollController,
                                             thumbVisibility: true,
                                             child: Padding(
-                                              padding: const EdgeInsets.only(bottom: 8.0),
+                                              padding: const EdgeInsets.only(
+                                                bottom: 8.0,
+                                              ),
                                               child: SingleChildScrollView(
-                                                controller: _seasonsScrollController,
-                                                scrollDirection: Axis.horizontal,
+                                                controller:
+                                                    _seasonsScrollController,
+                                                scrollDirection:
+                                                    Axis.horizontal,
                                                 child: Row(
-                                                  children: List.generate(seasons.length, (index) {
-                                                    final season = seasons[index];
-                                                    final isSelected = season == _selectedSeason;
-                                                    
+                                                  children: List.generate(seasons.length, (
+                                                    index,
+                                                  ) {
+                                                    final season =
+                                                        seasons[index];
+                                                    final isSelected =
+                                                        season ==
+                                                        _selectedSeason;
+
                                                     // Initial scroll to selected
-                                                    if (isSelected && _firstSeasonNode.context == null) {
-                                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                        if (_firstSeasonNode.context != null && _seasonsScrollController.hasClients) {
+                                                    if (isSelected &&
+                                                        _firstSeasonNode
+                                                                .context ==
+                                                            null) {
+                                                      WidgetsBinding.instance.addPostFrameCallback((
+                                                        _,
+                                                      ) {
+                                                        if (_firstSeasonNode
+                                                                    .context !=
+                                                                null &&
+                                                            _seasonsScrollController
+                                                                .hasClients) {
                                                           Scrollable.ensureVisible(
-                                                            _firstSeasonNode.context!,
+                                                            _firstSeasonNode
+                                                                .context!,
                                                             alignment: 0.5,
-                                                            duration: const Duration(milliseconds: 300),
+                                                            duration:
+                                                                const Duration(
+                                                                  milliseconds:
+                                                                      300,
+                                                                ),
                                                           );
                                                         }
                                                       });
                                                     }
 
                                                     return Padding(
-                                                      padding: const EdgeInsets.only(right: 12.0),
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            right: 12.0,
+                                                          ),
                                                       child: _buildFilterChip(
                                                         text: 'Season $season',
                                                         isSelected: isSelected,
-                                                        focusNode: isSelected ? _firstSeasonNode : null,
+                                                        focusNode: isSelected
+                                                            ? _firstSeasonNode
+                                                            : null,
                                                         onKeyEvent: (node, event) {
-                                                          if (event is KeyDownEvent) {
+                                                          if (event
+                                                              is KeyDownEvent) {
                                                             return _handleRowFocus(
                                                               _firstSeasonNode,
                                                               event,
                                                               detail,
                                                               () {
                                                                 setState(() {
-                                                                  _selectedSeason = season;
-                                                                  _selectedPage = 0;
+                                                                  _selectedSeason =
+                                                                      season;
+                                                                  _selectedPage =
+                                                                      0;
                                                                 });
                                                               },
                                                             );
                                                           }
-                                                          return KeyEventResult.ignored;
+                                                          return KeyEventResult
+                                                              .ignored;
                                                         },
                                                         onTap: () {
                                                           setState(() {
-                                                            _selectedSeason = season;
+                                                            _selectedSeason =
+                                                                season;
                                                             _selectedPage = 0;
                                                           });
                                                         },
@@ -715,12 +873,12 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   }),
                                                 ),
                                               ),
-                                        ),
-                                        ),
+                                            ),
+                                          ),
                                         ),
                                         const SizedBox(height: 16),
                                       ],
-                                      
+
                                       // Page Selector
                                       if (totalPages > 1) ...[
                                         SizedBox(
@@ -729,58 +887,105 @@ class _DetailScreenState extends State<DetailScreen> {
                                             controller: _pagesScrollController,
                                             thumbVisibility: true,
                                             child: Padding(
-                                              padding: const EdgeInsets.only(bottom: 8.0),
+                                              padding: const EdgeInsets.only(
+                                                bottom: 8.0,
+                                              ),
                                               child: SingleChildScrollView(
-                                                controller: _pagesScrollController,
-                                                scrollDirection: Axis.horizontal,
+                                                controller:
+                                                    _pagesScrollController,
+                                                scrollDirection:
+                                                    Axis.horizontal,
                                                 child: Row(
-                                                  children: List.generate(totalPages, (index) {
-                                                    final startIdx = index * _episodesPerPage;
-                                                    final endIdx = (index + 1) * _episodesPerPage;
-                                                    final actualEndIdx = endIdx > seasonEpisodes.length ? seasonEpisodes.length : endIdx;
-                                                    
-                                                    final startEpNum = seasonEpisodes[startIdx].number.toInt();
-                                                    final endEpNum = seasonEpisodes[actualEndIdx - 1].number.toInt();
-                                                    
-                                                    final isSelected = index == _selectedPage;
+                                                  children: List.generate(totalPages, (
+                                                    index,
+                                                  ) {
+                                                    final startIdx =
+                                                        index *
+                                                        _episodesPerPage;
+                                                    final endIdx =
+                                                        (index + 1) *
+                                                        _episodesPerPage;
+                                                    final actualEndIdx =
+                                                        endIdx >
+                                                            seasonEpisodes
+                                                                .length
+                                                        ? seasonEpisodes.length
+                                                        : endIdx;
+
+                                                    final startEpNum =
+                                                        seasonEpisodes[startIdx]
+                                                            .number
+                                                            .toInt();
+                                                    final endEpNum =
+                                                        seasonEpisodes[actualEndIdx -
+                                                                1]
+                                                            .number
+                                                            .toInt();
+
+                                                    final isSelected =
+                                                        index == _selectedPage;
 
                                                     // Initial scroll to selected
-                                                    if (isSelected && _firstPageNode.context == null) {
-                                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                        if (_firstPageNode.context != null && _pagesScrollController.hasClients) {
+                                                    if (isSelected &&
+                                                        _firstPageNode
+                                                                .context ==
+                                                            null) {
+                                                      WidgetsBinding.instance.addPostFrameCallback((
+                                                        _,
+                                                      ) {
+                                                        if (_firstPageNode
+                                                                    .context !=
+                                                                null &&
+                                                            _pagesScrollController
+                                                                .hasClients) {
                                                           Scrollable.ensureVisible(
-                                                            _firstPageNode.context!,
+                                                            _firstPageNode
+                                                                .context!,
                                                             alignment: 0.5,
-                                                            duration: const Duration(milliseconds: 300),
+                                                            duration:
+                                                                const Duration(
+                                                                  milliseconds:
+                                                                      300,
+                                                                ),
                                                           );
                                                         }
                                                       });
                                                     }
 
                                                     return Padding(
-                                                      padding: const EdgeInsets.only(right: 12.0),
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            right: 12.0,
+                                                          ),
                                                       child: _buildFilterChip(
-                                                        text: 'Episodes $startEpNum - $endEpNum',
+                                                        text:
+                                                            'Episodes $startEpNum - $endEpNum',
                                                         isSelected: isSelected,
-                                                        focusNode: isSelected ? _firstPageNode : null,
+                                                        focusNode: isSelected
+                                                            ? _firstPageNode
+                                                            : null,
                                                         onKeyEvent: (node, event) {
-                                                          if (event is KeyDownEvent) {
+                                                          if (event
+                                                              is KeyDownEvent) {
                                                             return _handleRowFocus(
                                                               _firstPageNode,
                                                               event,
                                                               detail,
                                                               () {
                                                                 setState(() {
-                                                                  _selectedPage = index;
+                                                                  _selectedPage =
+                                                                      index;
                                                                 });
                                                               },
                                                             );
                                                           }
-                                                          return KeyEventResult.ignored;
+                                                          return KeyEventResult
+                                                              .ignored;
                                                         },
                                                         onTap: () {
                                                           setState(() {
-                                                            _selectedPage = index;
+                                                            _selectedPage =
+                                                                index;
                                                           });
                                                         },
                                                       ),
@@ -788,12 +993,12 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   }),
                                                 ),
                                               ),
-                                        ),
-                                        ),
+                                            ),
+                                          ),
                                         ),
                                         const SizedBox(height: 16),
                                       ],
-                                      
+
                                       // Episodes List
                                       SizedBox(
                                         height: 136,
@@ -801,31 +1006,60 @@ class _DetailScreenState extends State<DetailScreen> {
                                           controller: _episodesScrollController,
                                           thumbVisibility: true,
                                           child: Padding(
-                                            padding: const EdgeInsets.only(bottom: 16.0),
+                                            padding: const EdgeInsets.only(
+                                              bottom: 16.0,
+                                            ),
                                             child: SingleChildScrollView(
-                                              controller: _episodesScrollController,
+                                              controller:
+                                                  _episodesScrollController,
                                               scrollDirection: Axis.horizontal,
                                               child: Row(
-                                                children: List.generate(pageEpisodes.length, (index) {
-                                                  final ep = pageEpisodes[index];
+                                                children: List.generate(pageEpisodes.length, (
+                                                  index,
+                                                ) {
+                                                  final ep =
+                                                      pageEpisodes[index];
                                                   bool isTarget = false;
-                                                  if (_historyItem != null && pageEpisodes.any((e) => e.id == _historyItem!.episodeId)) {
-                                                    isTarget = ep.id == _historyItem!.episodeId;
+                                                  if (_historyItem != null &&
+                                                      pageEpisodes.any(
+                                                        (e) =>
+                                                            e.id ==
+                                                            _historyItem!
+                                                                .episodeId,
+                                                      )) {
+                                                    isTarget =
+                                                        ep.id ==
+                                                        _historyItem!.episodeId;
                                                   } else {
                                                     isTarget = index == 0;
                                                   }
-                                                  
+
                                                   // Initial scroll to target when first built
-                                                  if (isTarget && _firstEpisodeNode.context == null) {
-                                                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                      if (_firstEpisodeNode.context != null && _episodesScrollController.hasClients) {
-                                                        Scrollable.ensureVisible(
-                                                          _firstEpisodeNode.context!,
-                                                          alignment: 0.5,
-                                                          duration: const Duration(milliseconds: 300),
-                                                        );
-                                                      }
-                                                    });
+                                                  if (isTarget &&
+                                                      _firstEpisodeNode
+                                                              .context ==
+                                                          null) {
+                                                    WidgetsBinding.instance
+                                                        .addPostFrameCallback((
+                                                          _,
+                                                        ) {
+                                                          if (_firstEpisodeNode
+                                                                      .context !=
+                                                                  null &&
+                                                              _episodesScrollController
+                                                                  .hasClients) {
+                                                            Scrollable.ensureVisible(
+                                                              _firstEpisodeNode
+                                                                  .context!,
+                                                              alignment: 0.5,
+                                                              duration:
+                                                                  const Duration(
+                                                                    milliseconds:
+                                                                        300,
+                                                                  ),
+                                                            );
+                                                          }
+                                                        });
                                                   }
 
                                                   return _buildEpisodeItem(
@@ -836,8 +1070,8 @@ class _DetailScreenState extends State<DetailScreen> {
                                                 }),
                                               ),
                                             ),
-                                      ),
-                                      ),
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   );
@@ -875,8 +1109,10 @@ class _DetailScreenState extends State<DetailScreen> {
       epId = ep.id;
       epNumber = ep.number;
       String titleStr = ep.title ?? 'Episode ${ep.number.toInt()}';
-      final hasMultipleSeasons = detail.episodes.map((e) => e.season).toSet().length > 1;
-      if (hasMultipleSeasons && !titleStr.toUpperCase().startsWith('S${ep.season}')) {
+      final hasMultipleSeasons =
+          detail.episodes.map((e) => e.season).toSet().length > 1;
+      if (hasMultipleSeasons &&
+          !titleStr.toUpperCase().startsWith('S${ep.season}')) {
         titleStr = 'S${ep.season} - $titleStr';
       }
       epTitle = '${detail.title} - $titleStr';
@@ -890,13 +1126,18 @@ class _DetailScreenState extends State<DetailScreen> {
           if (history != null) {
             if (!context.mounted) return;
             // Resume history
-            String historyEpTitle = '${detail.title} - Episode ${history.episodeNumber.toInt()}';
+            String historyEpTitle =
+                '${detail.title} - Episode ${history.episodeNumber.toInt()}';
             try {
               if (detail.episodes.isNotEmpty) {
-                final ep = detail.episodes.firstWhere((e) => e.id == history.episodeId);
-                final hasMultipleSeasons = detail.episodes.map((e) => e.season).toSet().length > 1;
+                final ep = detail.episodes.firstWhere(
+                  (e) => e.id == history.episodeId,
+                );
+                final hasMultipleSeasons =
+                    detail.episodes.map((e) => e.season).toSet().length > 1;
                 String titleStr = ep.title ?? 'Episode ${ep.number.toInt()}';
-                if (hasMultipleSeasons && !titleStr.toUpperCase().startsWith('S${ep.season}')) {
+                if (hasMultipleSeasons &&
+                    !titleStr.toUpperCase().startsWith('S${ep.season}')) {
                   titleStr = 'S${ep.season} - $titleStr';
                 }
                 historyEpTitle = '${detail.title} - $titleStr';
@@ -904,7 +1145,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 historyEpTitle = detail.title;
               }
             } catch (_) {}
-            
+
             _playEpisode(
               context: context,
               movieId: widget.movie.id,
@@ -954,7 +1195,7 @@ class _DetailScreenState extends State<DetailScreen> {
     try {
       final source = getIt<MovieSource>();
       StreamInfo? streamInfo;
-      
+
       try {
         streamInfo = await source.getStreamInfo(
           movieId,
@@ -1016,16 +1257,16 @@ class _DetailScreenState extends State<DetailScreen> {
       Navigator.pop(context);
       final errorMsg = e.toString().replaceAll('Exception: ', '');
       _showStreamErrorDialog(
-          context: context,
-          movieId: movieId,
-          episodeId: episodeId,
-          title: title,
-          episodeNumber: episodeNumber,
-          allEpisodes: allEpisodes,
-          startPositionMs: startPositionMs,
-          serverId: serverId,
-          servers: servers,
-          error: errorMsg,
+        context: context,
+        movieId: movieId,
+        episodeId: episodeId,
+        title: title,
+        episodeNumber: episodeNumber,
+        allEpisodes: allEpisodes,
+        startPositionMs: startPositionMs,
+        serverId: serverId,
+        servers: servers,
+        error: errorMsg,
       );
     }
   }
@@ -1046,8 +1287,14 @@ class _DetailScreenState extends State<DetailScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Stream Error', style: TextStyle(color: Colors.white)),
-        content: Text('Failed to load video stream.\n$error', style: const TextStyle(color: Colors.white70)),
+        title: const Text(
+          'Stream Error',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Failed to load video stream.\n$error',
+          style: const TextStyle(color: Colors.white70),
+        ),
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.white10),
@@ -1077,7 +1324,10 @@ class _DetailScreenState extends State<DetailScreen> {
                   },
                 );
               },
-              child: const Text('Change Server', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Change Server',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ElevatedButton(
             autofocus: true,
@@ -1120,7 +1370,14 @@ class _DetailScreenState extends State<DetailScreen> {
             children: [
               const Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text('Select Server', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Select Server',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               Flexible(
                 child: SingleChildScrollView(
@@ -1129,7 +1386,10 @@ class _DetailScreenState extends State<DetailScreen> {
                       return ListTile(
                         autofocus: s == servers.first,
                         focusColor: Colors.white24,
-                        title: Text(s.name, style: const TextStyle(color: Colors.white)),
+                        title: Text(
+                          s.name,
+                          style: const TextStyle(color: Colors.white),
+                        ),
                         onTap: () {
                           Navigator.pop(context);
                           onSelect(s.id);
@@ -1146,7 +1406,11 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _buildEpisodeItem(Episode ep, MovieDetail detail, {bool isFirst = false}) {
+  Widget _buildEpisodeItem(
+    Episode ep,
+    MovieDetail detail, {
+    bool isFirst = false,
+  }) {
     final allEpisodes = detail.episodes;
     return Padding(
       padding: const EdgeInsets.only(right: 16.0),
@@ -1162,39 +1426,40 @@ class _DetailScreenState extends State<DetailScreen> {
                 onFocusChange: (focused) => setState(() => isFocused = focused),
                 onKeyEvent: (node, event) {
                   if (event is KeyDownEvent) {
-                    return _handleRowFocus(
-                      _firstEpisodeNode,
-                      event,
-                      detail,
-                      () {
-                        final hasMultipleSeasons = allEpisodes.map((e) => e.season).toSet().length > 1;
-                        final title = hasMultipleSeasons 
-                            ? 'S${ep.season} - ${ep.title ?? 'Episode ${ep.number.toInt()}'}'
-                            : (ep.title ?? '${widget.movie.title} - Episode ${ep.number.toInt()}');
-                        _playEpisode(
-                          context: context,
-                          movieId: widget.movie.id,
-                          episodeId: ep.id,
-                          title: title,
-                          episodeNumber: ep.number,
-                          allEpisodes: allEpisodes,
-                          serverId: _selectedServerId,
-                          servers: detail.servers,
-                        );
-                      },
-                    );
+                    return _handleRowFocus(_firstEpisodeNode, event, detail, () {
+                      final hasMultipleSeasons =
+                          allEpisodes.map((e) => e.season).toSet().length > 1;
+                      final title = hasMultipleSeasons
+                          ? 'S${ep.season} - ${ep.title ?? 'Episode ${ep.number.toInt()}'}'
+                          : (ep.title ??
+                                '${widget.movie.title} - Episode ${ep.number.toInt()}');
+                      _playEpisode(
+                        context: context,
+                        movieId: widget.movie.id,
+                        episodeId: ep.id,
+                        title: title,
+                        episodeNumber: ep.number,
+                        allEpisodes: allEpisodes,
+                        serverId: _selectedServerId,
+                        servers: detail.servers,
+                      );
+                    });
                   }
                   return KeyEventResult.ignored;
                 },
                 child: GestureDetector(
                   onTap: () {
-                    final hasMultipleSeasons = allEpisodes.map((e) => e.season).toSet().length > 1;
-                    String titleStr = ep.title ?? 'Episode ${ep.number.toInt()}';
-                    if (hasMultipleSeasons && !titleStr.toUpperCase().startsWith('S${ep.season}')) {
+                    final hasMultipleSeasons =
+                        allEpisodes.map((e) => e.season).toSet().length > 1;
+                    String titleStr =
+                        ep.title ?? 'Episode ${ep.number.toInt()}';
+                    if (hasMultipleSeasons &&
+                        !titleStr.toUpperCase().startsWith('S${ep.season}')) {
                       titleStr = 'S${ep.season} - $titleStr';
                     }
                     String title = '${widget.movie.title} - $titleStr';
-                    if (widget.movie.title == titleStr || widget.movie.type == 'movie') {
+                    if (widget.movie.title == titleStr ||
+                        widget.movie.type == 'movie') {
                       title = widget.movie.title;
                     }
                     _playEpisode(
@@ -1240,9 +1505,18 @@ class _DetailScreenState extends State<DetailScreen> {
                         children: [
                           Builder(
                             builder: (context) {
-                              final hasMultipleSeasons = allEpisodes.map((e) => e.season).toSet().length > 1;
-                              String titleStr = ep.title ?? 'Episode ${ep.number.toInt()}';
-                              if (hasMultipleSeasons && !titleStr.toUpperCase().startsWith('S${ep.season}')) {
+                              final hasMultipleSeasons =
+                                  allEpisodes
+                                      .map((e) => e.season)
+                                      .toSet()
+                                      .length >
+                                  1;
+                              String titleStr =
+                                  ep.title ?? 'Episode ${ep.number.toInt()}';
+                              if (hasMultipleSeasons &&
+                                  !titleStr.toUpperCase().startsWith(
+                                    'S${ep.season}',
+                                  )) {
                                 titleStr = 'S${ep.season} - $titleStr';
                               }
                               final displayName = titleStr;
@@ -1252,12 +1526,14 @@ class _DetailScreenState extends State<DetailScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: isFocused ? Colors.white : Colors.white70,
+                                  color: isFocused
+                                      ? Colors.white
+                                      : Colors.white70,
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
                               );
-                            }
+                            },
                           ),
                           if (ep.hasSub) ...[
                             const SizedBox(height: 8),
@@ -1297,35 +1573,45 @@ class _DetailScreenState extends State<DetailScreen> {
           builder: (context, setFocusState) {
             return Focus(
               focusNode: focusNode,
-              onFocusChange: (focused) => setFocusState(() => isFocused = focused),
-              onKeyEvent: onKeyEvent ?? (node, event) {
-                if (event is KeyDownEvent &&
-                    (event.logicalKey == LogicalKeyboardKey.select ||
-                        event.logicalKey == LogicalKeyboardKey.enter)) {
-                  onTap();
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
-              },
+              onFocusChange: (focused) =>
+                  setFocusState(() => isFocused = focused),
+              onKeyEvent:
+                  onKeyEvent ??
+                  (node, event) {
+                    if (event is KeyDownEvent &&
+                        (event.logicalKey == LogicalKeyboardKey.select ||
+                            event.logicalKey == LogicalKeyboardKey.enter)) {
+                      onTap();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
               child: GestureDetector(
                 onTap: onTap,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: isFocused ? Colors.white : (isSelected ? AppColors.primary : AppColors.surface),
+                    color: isFocused
+                        ? Colors.white
+                        : (isSelected ? AppColors.primary : AppColors.surface),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isFocused ? Colors.white : Colors.transparent,
                       width: 2,
                     ),
-                    boxShadow: isFocused ? [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.6),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      )
-                    ] : [],
+                    boxShadow: isFocused
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.6),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                        : [],
                   ),
                   child: Center(
                     child: Text(
@@ -1334,7 +1620,9 @@ class _DetailScreenState extends State<DetailScreen> {
                         color: isSelected
                             ? (isFocused ? AppColors.background : Colors.white)
                             : Colors.white,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ),

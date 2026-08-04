@@ -78,10 +78,20 @@ class _VolumeMixerDialogState extends State<VolumeMixerDialog> {
                 children: [
                   Icon(Icons.movie, color: Colors.white70, size: 16),
                   SizedBox(width: 8),
-                  Text('Media Volume', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  Text(
+                    'Media Volume',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
                 ],
               ),
-              Text('${(_videoVolume * 100).toInt()}%', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(
+                '${(_videoVolume * 100).toInt()}%',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
           Slider(
@@ -104,12 +114,26 @@ class _VolumeMixerDialogState extends State<VolumeMixerDialog> {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.record_voice_over, color: Colors.white70, size: 16),
+                  Icon(
+                    Icons.record_voice_over,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
                   SizedBox(width: 8),
-                  Text('Voice-over Volume', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                  Text(
+                    'Voice-over Volume',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
                 ],
               ),
-              Text('${(_ttsVolume * 100).toInt()}%', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(
+                '${(_ttsVolume * 100).toInt()}%',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
           Slider(

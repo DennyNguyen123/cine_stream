@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/movie.dart';
@@ -17,8 +16,6 @@ import 'detail_screen.dart';
 import 'search_screen.dart';
 import '../widgets/movie_row.dart';
 import '../widgets/marquee_text.dart';
-import 'settings/tv_sync_screen.dart';
-import 'settings/mobile_sync_screen.dart';
 import 'settings/webdav_setup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -371,29 +368,47 @@ class _SourceButtonState extends State<_SourceButton> {
                         return StatefulBuilder(
                           builder: (context, setTileState) {
                             return Focus(
-                              focusNode: isFirst ? firstNode : (isLast ? lastNode : null),
+                              focusNode: isFirst
+                                  ? firstNode
+                                  : (isLast ? lastNode : null),
                               autofocus: isSelected,
-                              onFocusChange: (focused) => setTileState(() => isFocused = focused),
+                              onFocusChange: (focused) =>
+                                  setTileState(() => isFocused = focused),
                               onKeyEvent: (node, event) {
                                 if (event is KeyDownEvent) {
-                                  if (isFirst && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                  if (isFirst &&
+                                      event.logicalKey ==
+                                          LogicalKeyboardKey.arrowUp) {
                                     lastNode.requestFocus();
                                     return KeyEventResult.handled;
                                   }
-                                  if (isLast && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                  if (isLast &&
+                                      event.logicalKey ==
+                                          LogicalKeyboardKey.arrowDown) {
                                     firstNode.requestFocus();
                                     return KeyEventResult.handled;
                                   }
-                                  if (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter) {
+                                  if (event.logicalKey ==
+                                          LogicalKeyboardKey.select ||
+                                      event.logicalKey ==
+                                          LogicalKeyboardKey.enter) {
                                     Navigator.pop(ctx);
                                     if (!isSelected) {
-                                      sourceManager.setActiveSource(source['id']!).then((_) {
-                                        PaintingBinding.instance.imageCache.clear();
-                                        PaintingBinding.instance.imageCache.clearLiveImages();
-                                        if (!outerContext.mounted) return;
-                                        outerContext.read<HomeCubit>().loadData();
-                                        outerContext.read<HistoryCubit>().loadHistory();
-                                      });
+                                      sourceManager
+                                          .setActiveSource(source['id']!)
+                                          .then((_) {
+                                            PaintingBinding.instance.imageCache
+                                                .clear();
+                                            PaintingBinding.instance.imageCache
+                                                .clearLiveImages();
+                                            if (!outerContext.mounted) return;
+                                            outerContext
+                                                .read<HomeCubit>()
+                                                .loadData();
+                                            outerContext
+                                                .read<HistoryCubit>()
+                                                .loadHistory();
+                                          });
                                     }
                                     return KeyEventResult.handled;
                                   }
@@ -404,36 +419,61 @@ class _SourceButtonState extends State<_SourceButton> {
                                 onTap: () async {
                                   Navigator.pop(ctx);
                                   if (!isSelected) {
-                                    await sourceManager.setActiveSource(source['id']!);
+                                    await sourceManager.setActiveSource(
+                                      source['id']!,
+                                    );
                                     PaintingBinding.instance.imageCache.clear();
-                                    PaintingBinding.instance.imageCache.clearLiveImages();
+                                    PaintingBinding.instance.imageCache
+                                        .clearLiveImages();
                                     if (!outerContext.mounted) return;
                                     outerContext.read<HomeCubit>().loadData();
-                                    outerContext.read<HistoryCubit>().loadHistory();
+                                    outerContext
+                                        .read<HistoryCubit>()
+                                        .loadHistory();
                                   }
                                 },
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: isFocused ? AppColors.primary.withValues(alpha: 0.4) : (isSelected ? Colors.white12 : Colors.transparent),
-                                    border: Border.all(color: isFocused ? AppColors.primary : Colors.transparent, width: 2),
+                                    color: isFocused
+                                        ? AppColors.primary.withValues(
+                                            alpha: 0.4,
+                                          )
+                                        : (isSelected
+                                              ? Colors.white12
+                                              : Colors.transparent),
+                                    border: Border.all(
+                                      color: isFocused
+                                          ? AppColors.primary
+                                          : Colors.transparent,
+                                      width: 2,
+                                    ),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: ListTile(
                                     title: Text(
                                       source['name'] ?? '',
                                       style: TextStyle(
-                                        color: isSelected ? AppColors.primary : Colors.white,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : Colors.white,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
                                       ),
                                     ),
-                                    trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+                                    trailing: isSelected
+                                        ? const Icon(
+                                            Icons.check,
+                                            color: AppColors.primary,
+                                          )
+                                        : null,
                                   ),
                                 ),
                               ),
                             );
-                          }
+                          },
                         );
-                      }
+                      },
                     );
                   },
                 ),
@@ -612,15 +652,27 @@ class _SettingsButtonState extends State<_SettingsButton> {
                         return Focus(
                           focusNode: firstNode,
                           autofocus: true,
-                          onFocusChange: (focused) => setTileState(() => isFocused = focused),
+                          onFocusChange: (focused) =>
+                              setTileState(() => isFocused = focused),
                           onKeyEvent: (node, event) {
-                            if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                            if (event is KeyDownEvent &&
+                                event.logicalKey ==
+                                    LogicalKeyboardKey.arrowUp) {
                               lastNode.requestFocus();
                               return KeyEventResult.handled;
                             }
-                            if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+                            if (event is KeyDownEvent &&
+                                (event.logicalKey ==
+                                        LogicalKeyboardKey.select ||
+                                    event.logicalKey ==
+                                        LogicalKeyboardKey.enter)) {
                               Navigator.pop(ctx);
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const WebdavSetupScreen()));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const WebdavSetupScreen(),
+                                ),
+                              );
                               return KeyEventResult.handled;
                             }
                             return KeyEventResult.ignored;
@@ -628,24 +680,45 @@ class _SettingsButtonState extends State<_SettingsButton> {
                           child: GestureDetector(
                             onTap: () {
                               Navigator.pop(ctx);
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const WebdavSetupScreen()));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const WebdavSetupScreen(),
+                                ),
+                              );
                             },
                             child: Container(
                               decoration: BoxDecoration(
-                                color: isFocused ? AppColors.primary.withValues(alpha: 0.4) : Colors.transparent,
-                                border: Border.all(color: isFocused ? AppColors.primary : Colors.transparent, width: 2),
+                                color: isFocused
+                                    ? AppColors.primary.withValues(alpha: 0.4)
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: isFocused
+                                      ? AppColors.primary
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const ListTile(
-                                leading: Icon(Icons.settings_suggest, color: Colors.white),
-                                title: Text('App Settings', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                leading: Icon(
+                                  Icons.settings_suggest,
+                                  color: Colors.white,
+                                ),
+                                title: Text(
+                                  'App Settings',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         );
-                      }
+                      },
                     );
-                  }
+                  },
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8.0),
@@ -673,39 +746,75 @@ class _SettingsButtonState extends State<_SettingsButton> {
                       builder: (context, setTileState) {
                         return Focus(
                           focusNode: lastNode,
-                          onFocusChange: (focused) => setTileState(() => isFocused = focused),
+                          onFocusChange: (focused) =>
+                              setTileState(() => isFocused = focused),
                           onKeyEvent: (node, event) {
-                            if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                            if (event is KeyDownEvent &&
+                                event.logicalKey ==
+                                    LogicalKeyboardKey.arrowDown) {
                               firstNode.requestFocus();
                               return KeyEventResult.handled;
                             }
-                            if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
-                              launchUrl(Uri.parse('https://github.com/DennyNguyen123/cine_stream'), mode: LaunchMode.externalApplication);
+                            if (event is KeyDownEvent &&
+                                (event.logicalKey ==
+                                        LogicalKeyboardKey.select ||
+                                    event.logicalKey ==
+                                        LogicalKeyboardKey.enter)) {
+                              launchUrl(
+                                Uri.parse(
+                                  'https://github.com/DennyNguyen123/cine_stream',
+                                ),
+                                mode: LaunchMode.externalApplication,
+                              );
                               return KeyEventResult.handled;
                             }
                             return KeyEventResult.ignored;
                           },
                           child: GestureDetector(
                             onTap: () {
-                              launchUrl(Uri.parse('https://github.com/DennyNguyen123/cine_stream'), mode: LaunchMode.externalApplication);
+                              launchUrl(
+                                Uri.parse(
+                                  'https://github.com/DennyNguyen123/cine_stream',
+                                ),
+                                mode: LaunchMode.externalApplication,
+                              );
                             },
                             child: Container(
                               decoration: BoxDecoration(
-                                color: isFocused ? AppColors.primary.withValues(alpha: 0.4) : Colors.transparent,
-                                border: Border.all(color: isFocused ? AppColors.primary : Colors.transparent, width: 2),
+                                color: isFocused
+                                    ? AppColors.primary.withValues(alpha: 0.4)
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: isFocused
+                                      ? AppColors.primary
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const ListTile(
-                                leading: Icon(Icons.star_border, color: Colors.white),
-                                title: Text('Star us on GitHub', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                subtitle: Text('View source code & contribute', style: TextStyle(color: Colors.white70)),
+                                leading: Icon(
+                                  Icons.star_border,
+                                  color: Colors.white,
+                                ),
+                                title: Text(
+                                  'Star us on GitHub',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'View source code & contribute',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
                               ),
                             ),
                           ),
                         );
-                      }
+                      },
                     );
-                  }
+                  },
                 ),
               ],
             ),

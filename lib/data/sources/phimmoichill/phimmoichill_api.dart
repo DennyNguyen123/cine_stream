@@ -11,7 +11,7 @@ class PhimMoiChillApi {
   String? _resolvedBaseUrl;
   String? _resolvedApiUrl;
 
-  String get resolvedBaseUrl => _resolvedBaseUrl ?? 'https://phimmoi.date';
+  String get resolvedBaseUrl => _resolvedBaseUrl ?? 'https://phimmoichill.vin';
 
   PhimMoiChillApi(this._dio);
 
@@ -19,7 +19,7 @@ class PhimMoiChillApi {
     if (_resolvedBaseUrl != null) return;
     try {
       final response = await _dio.get(
-        'https://phimmoichill.live/',
+        'https://phimmoichill.vin/',
         options: Options(
           headers: {
             'User-Agent':
@@ -30,18 +30,22 @@ class PhimMoiChillApi {
 
       String targetUrl = '';
       final realUri = response.realUri;
-      if (realUri.host != 'phimmoichill.live' && realUri.host.isNotEmpty) {
+      if (realUri.host != 'phimmoichill.vin' && realUri.host.isNotEmpty) {
         targetUrl = '${realUri.scheme}://${realUri.host}';
       } else {
         final html = response.data.toString();
-        final canonicalRegex = RegExp(r'<link[^>]*rel="canonical"[^>]*href="([^"]+)"');
+        final canonicalRegex = RegExp(
+          r'<link[^>]*rel="canonical"[^>]*href="([^"]+)"',
+        );
         final canonicalMatch = canonicalRegex.firstMatch(html);
         if (canonicalMatch != null) {
           targetUrl = canonicalMatch.group(1) ?? '';
         }
 
         if (targetUrl.isEmpty) {
-          final ogUrlRegex = RegExp(r'<meta[^>]*property="og:url"[^>]*content="([^"]+)"');
+          final ogUrlRegex = RegExp(
+            r'<meta[^>]*property="og:url"[^>]*content="([^"]+)"',
+          );
           final ogUrlMatch = ogUrlRegex.firstMatch(html);
           if (ogUrlMatch != null) {
             targetUrl = ogUrlMatch.group(1) ?? '';
@@ -64,16 +68,18 @@ class PhimMoiChillApi {
         final uri = Uri.parse(targetUrl);
         final host = uri.host;
         _resolvedBaseUrl = 'https://$host';
-        _resolvedApiUrl = 'https://cdn.$host/api/v1';
-        debugPrint('PhimMoiChillApi: Resolved baseUrl=$_resolvedBaseUrl, apiUrl=$_resolvedApiUrl');
+        _resolvedApiUrl = 'https://$host/api/v1';
+        debugPrint(
+          'PhimMoiChillApi: Resolved baseUrl=$_resolvedBaseUrl, apiUrl=$_resolvedApiUrl',
+        );
         return;
       }
     } catch (e) {
       debugPrint('PhimMoiChillApi _ensureInitialized Error: $e');
     }
 
-    _resolvedBaseUrl = 'https://phimmoi.date';
-    _resolvedApiUrl = 'https://cdn.phimmoi.date/api/v1';
+    _resolvedBaseUrl = 'https://phimmoichill.vin';
+    _resolvedApiUrl = 'https://phimmoichill.vin/api/v1';
   }
 
   Future<PhimMoiSearchResponse?> searchMovies({
@@ -240,20 +246,24 @@ class PhimMoiChillApi {
           String href = m.group(2) ?? m.group(3) ?? '';
           if (href.isNotEmpty) {
             href = href.split('?').first;
-            if (href.endsWith('/vietsub')) href = href.substring(0, href.length - 8);
-            if (href.endsWith('/thuyet-minh')) href = href.substring(0, href.length - 12);
-            
+            if (href.endsWith('/vietsub'))
+              href = href.substring(0, href.length - 8);
+            if (href.endsWith('/thuyet-minh'))
+              href = href.substring(0, href.length - 12);
+
             if (!seenUrls.contains(href)) {
               seenUrls.add(href);
               if (title.contains('-')) {
-              title = title.split('-').first.trim();
-            }
-            if (title.isEmpty) {
-              final uri = Uri.tryParse(href);
-              if (uri != null && uri.pathSegments.length >= 3) {
-                title = uri.pathSegments[2].replaceAll('-', ' ').toUpperCase();
+                title = title.split('-').first.trim();
               }
-            }
+              if (title.isEmpty) {
+                final uri = Uri.tryParse(href);
+                if (uri != null && uri.pathSegments.length >= 3) {
+                  title = uri.pathSegments[2]
+                      .replaceAll('-', ' ')
+                      .toUpperCase();
+                }
+              }
               episodes.add({'title': title, 'url': href});
             }
           }
@@ -321,7 +331,8 @@ class PhimMoiChillApi {
           final sourcesList = jsonDecode(sourceMatch.group(1)!) as List;
           if (serverSlug != null) {
             for (var src in sourcesList) {
-              if (src['server'] != null && src['server']['slug'] == serverSlug) {
+              if (src['server'] != null &&
+                  src['server']['slug'] == serverSlug) {
                 matchedEmbedUrl = src['link']?.toString();
                 break;
               }

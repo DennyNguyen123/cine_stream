@@ -10,10 +10,18 @@ abstract class MovieSource {
 
   Future<List<HomeSection>> getHomeSections();
   Future<FilterConfig> getFilterConfig();
-  
+
   Future<List<Movie>> searchMovies(String query);
-  Future<List<Movie>> advancedSearch(Map<String, dynamic> filters, {int page = 1, String query = ''});
-  
+  Future<List<Movie>> advancedSearch(
+    Map<String, dynamic> filters, {
+    int page = 1,
+    String query = '',
+  });
+
   Future<MovieDetail?> getMovieDetail(String id);
-  Future<StreamInfo?> getStreamInfo(String movieId, String episodeId, {String? serverId});
+  Future<StreamInfo?> getStreamInfo(
+    String movieId,
+    String episodeId, {
+    String? serverId,
+  });
 }

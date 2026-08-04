@@ -12,11 +12,11 @@ class SubtitleTrack {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'src': src,
-        'label': label,
-        'languageCode': languageCode,
-      };
+    'id': id,
+    'src': src,
+    'label': label,
+    'languageCode': languageCode,
+  };
 
   factory SubtitleTrack.fromJson(Map<String, dynamic> json) {
     return SubtitleTrack(

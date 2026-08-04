@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -14,11 +13,11 @@ class WebViewExtractorScreen extends StatefulWidget {
   final List<SubtitleTrack> subtitles;
 
   const WebViewExtractorScreen({
-    Key? key,
+    super.key,
     required this.embedUrl,
     required this.serverId,
     required this.subtitles,
-  }) : super(key: key);
+  });
 
   @override
   State<WebViewExtractorScreen> createState() => _WebViewExtractorScreenState();
@@ -26,16 +25,16 @@ class WebViewExtractorScreen extends StatefulWidget {
 
 class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
   InAppWebViewController? _webViewController;
-  
+
   double _cursorX = 0;
   double _cursorY = 0;
   final double _cursorSpeed = 25.0;
-  
+
   bool _isInit = false;
   bool _isExtracted = false;
 
   final FocusNode _focusNode = FocusNode();
-  
+
   @override
   void initState() {
     super.initState();
@@ -56,17 +55,24 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
     super.dispose();
   }
 
-  Future<String> resolveRedirect(String url, Map<String, String> headers) async {
-    print('[WebViewExtractor UI] resolveRedirect: waiting 1s for WebView to release connection...');
+  Future<String> resolveRedirect(
+    String url,
+    Map<String, String> headers,
+  ) async {
+    print(
+      '[WebViewExtractor UI] resolveRedirect: waiting 1s for WebView to release connection...',
+    );
     await Future.delayed(const Duration(seconds: 1));
-    
+
     final client = HttpClient();
     try {
       var request = await client.getUrl(Uri.parse(url));
       headers.forEach((k, v) => request.headers.set(k, v));
       request.followRedirects = false;
       var response = await request.close();
-      print('[WebViewExtractor UI] resolveRedirect status: ${response.statusCode}');
+      print(
+        '[WebViewExtractor UI] resolveRedirect status: ${response.statusCode}',
+      );
       if (response.isRedirect) {
         final loc = response.headers.value(HttpHeaders.locationHeader) ?? url;
         print('[WebViewExtractor UI] resolveRedirect location: $loc');
@@ -85,7 +91,7 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
     if (_isExtracted) return;
     _isExtracted = true;
     print('[WebViewExtractor UI] ✓ Found genuine stream: $capturedUrl');
-    
+
     // Attempt to parse domain from current URL or embed URL
     String currentUrl = widget.embedUrl;
     try {
@@ -94,62 +100,98 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
     } catch (_) {}
 
     final uri = Uri.tryParse(currentUrl);
-    final origin = uri != null ? '${uri.scheme}://${uri.host}' : 'https://vidsrcme.ru';
+    final origin = uri != null
+        ? '${uri.scheme}://${uri.host}'
+        : 'https://vidsrcme.ru';
 
     final headers = {
       'Referer': currentUrl,
       'Origin': origin,
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     };
 
     try {
       final cookieManager = CookieManager.instance();
-      final iframeCookies = await cookieManager.getCookies(url: WebUri(currentUrl)).timeout(const Duration(seconds: 2));
-      final streamCookies = await cookieManager.getCookies(url: WebUri(capturedUrl)).timeout(const Duration(seconds: 2));
-      
+      final iframeCookies = await cookieManager
+          .getCookies(url: WebUri(currentUrl))
+          .timeout(const Duration(seconds: 2));
+      final streamCookies = await cookieManager
+          .getCookies(url: WebUri(capturedUrl))
+          .timeout(const Duration(seconds: 2));
+
       final allCookies = <String, Cookie>{};
-      for (var c in iframeCookies) allCookies[c.name] = c;
-      for (var c in streamCookies) allCookies[c.name] = c;
-      
+      for (var c in iframeCookies) {
+        allCookies[c.name] = c;
+      }
+      for (var c in streamCookies) {
+        allCookies[c.name] = c;
+      }
+
       if (allCookies.isNotEmpty) {
-        headers['Cookie'] = allCookies.values.map((c) => '${c.name}=${c.value}').join('; ');
+        headers['Cookie'] = allCookies.values
+            .map((c) => '${c.name}=${c.value}')
+            .join('; ');
       }
     } catch (_) {}
 
     try {
-      _webViewController?.evaluateJavascript(source: "document.querySelectorAll('video').forEach(function(v) { v.pause(); v.removeAttribute('src'); v.load(); });");
+      _webViewController?.evaluateJavascript(
+        source:
+            "document.querySelectorAll('video').forEach(function(v) { v.pause(); v.removeAttribute('src'); v.load(); });",
+      );
     } catch (_) {}
 
     final finalUrl = await resolveRedirect(capturedUrl, headers);
-    
+
     if (mounted) {
-      Navigator.pop(context, StreamInfo(videoUrl: finalUrl, subtitles: widget.subtitles, headers: headers, currentServerId: widget.serverId));
+      Navigator.pop(
+        context,
+        StreamInfo(
+          videoUrl: finalUrl,
+          subtitles: widget.subtitles,
+          headers: headers,
+          currentServerId: widget.serverId,
+        ),
+      );
     }
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyDownEvent || event is KeyRepeatEvent) {
       final size = MediaQuery.of(context).size;
-      
+
       if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-        setState(() => _cursorY = (_cursorY - _cursorSpeed).clamp(0, size.height));
+        setState(
+          () => _cursorY = (_cursorY - _cursorSpeed).clamp(0, size.height),
+        );
         return KeyEventResult.handled;
       }
       if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-        setState(() => _cursorY = (_cursorY + _cursorSpeed).clamp(0, size.height));
+        setState(
+          () => _cursorY = (_cursorY + _cursorSpeed).clamp(0, size.height),
+        );
         return KeyEventResult.handled;
       }
       if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-        setState(() => _cursorX = (_cursorX - _cursorSpeed).clamp(0, size.width));
+        setState(
+          () => _cursorX = (_cursorX - _cursorSpeed).clamp(0, size.width),
+        );
         return KeyEventResult.handled;
       }
       if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-        setState(() => _cursorX = (_cursorX + _cursorSpeed).clamp(0, size.width));
+        setState(
+          () => _cursorX = (_cursorX + _cursorSpeed).clamp(0, size.width),
+        );
         return KeyEventResult.handled;
       }
-      if (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space) {
+      if (event.logicalKey == LogicalKeyboardKey.select ||
+          event.logicalKey == LogicalKeyboardKey.enter ||
+          event.logicalKey == LogicalKeyboardKey.space) {
         // Trigger click at cursor position
-        _webViewController?.evaluateJavascript(source: '''
+        _webViewController?.evaluateJavascript(
+          source:
+              '''
           (function() {
             var el = document.elementFromPoint($_cursorX, $_cursorY);
             if (el) {
@@ -164,15 +206,17 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
               console.log("[MyClicker] Clicked element at $_cursorX, $_cursorY");
             }
           })();
-        ''');
-        
+        ''',
+        );
+
         // Show click animation (optional visual feedback)
-        setState(() {}); 
+        setState(() {});
         return KeyEventResult.handled;
       }
-      
+
       // Escape or Back to close
-      if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.goBack) {
+      if (event.logicalKey == LogicalKeyboardKey.escape ||
+          event.logicalKey == LogicalKeyboardKey.goBack) {
         Navigator.pop(context);
         return KeyEventResult.handled;
       }
@@ -184,7 +228,20 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
   Widget build(BuildContext context) {
     if (!_isInit) return const Scaffold(backgroundColor: Colors.black);
 
-    final adPatterns = ['radiance', 'hexoic', 'doubleclick', 'googlesyndication', 'popads', 'adserver', 'popunder', 'propellerads', 'exdynsrv', 'onclick', 'bet365', '1xbet'];
+    final adPatterns = [
+      'radiance',
+      'hexoic',
+      'doubleclick',
+      'googlesyndication',
+      'popads',
+      'adserver',
+      'popunder',
+      'propellerads',
+      'exdynsrv',
+      'onclick',
+      'bet365',
+      '1xbet',
+    ];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -194,7 +251,8 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
             initialUrlRequest: URLRequest(url: WebUri(widget.embedUrl)),
             initialSettings: InAppWebViewSettings(
               useShouldOverrideUrlLoading: true,
-              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              userAgent:
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
               mediaPlaybackRequiresUserGesture: false,
               allowsInlineMediaPlayback: true,
               javaScriptEnabled: true,
@@ -202,7 +260,8 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
               allowFileAccess: true,
               allowContentAccess: true,
               domStorageEnabled: true,
-              javaScriptCanOpenWindowsAutomatically: false, // Strict block popups
+              javaScriptCanOpenWindowsAutomatically:
+                  false, // Strict block popups
               supportMultipleWindows: true,
               thirdPartyCookiesEnabled: true,
               mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
@@ -230,28 +289,38 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
                 ''',
                 injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
                 forMainFrameOnly: false,
-              )
+              ),
             ]),
             onWebViewCreated: (controller) {
               _webViewController = controller;
             },
             onCreateWindow: (controller, createWindowAction) async {
-              print('[WebViewExtractor UI] ⚠ Blocked popup window: \${createWindowAction.request.url}');
+              print(
+                '[WebViewExtractor UI] ⚠ Blocked popup window: \${createWindowAction.request.url}',
+              );
               return false; // Chặn cứng toàn bộ popup
             },
             shouldOverrideUrlLoading: (controller, navigationAction) async {
               final url = navigationAction.request.url?.toString() ?? '';
-              
+
               if (navigationAction.isForMainFrame) {
                 // Rất khắt khe: chỉ cho phép ở lại miền chiếu phim
-                if (!url.contains('vidnest.fun') && !url.contains('peachify.top') && !url.contains('vidsrcme.ru') && !url.contains('about:')) {
-                  print('[WebViewExtractor UI] 🛑 Blocked main frame redirect: $url');
+                if (!url.contains('vidnest.fun') &&
+                    !url.contains('peachify.top') &&
+                    !url.contains('vidsrcme.ru') &&
+                    !url.contains('about:')) {
+                  print(
+                    '[WebViewExtractor UI] 🛑 Blocked main frame redirect: $url',
+                  );
                   controller.stopLoading();
-                  return NavigationActionPolicy.ALLOW; // Hoặc CANCEL tùy phiên bản InAppWebView
+                  return NavigationActionPolicy
+                      .ALLOW; // Hoặc CANCEL tùy phiên bản InAppWebView
                 }
               } else {
                 if (adPatterns.any((p) => url.contains(p))) {
-                  print('[WebViewExtractor UI] 🛑 Blocked iframe redirect: $url');
+                  print(
+                    '[WebViewExtractor UI] 🛑 Blocked iframe redirect: $url',
+                  );
                   return NavigationActionPolicy.ALLOW; // Bỏ qua không load
                 }
               }
@@ -261,25 +330,45 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
               final reqUrl = request.url.toString();
 
               if (reqUrl.contains('disable-devtool')) {
-                return WebResourceResponse(data: Uint8List.fromList([]), statusCode: 404, headers: {'Access-Control-Allow-Origin': '*'});
+                return WebResourceResponse(
+                  data: Uint8List.fromList([]),
+                  statusCode: 404,
+                  headers: {'Access-Control-Allow-Origin': '*'},
+                );
               }
 
               if (adPatterns.any((p) => reqUrl.contains(p))) {
-                return WebResourceResponse(data: Uint8List.fromList([]), statusCode: 204, reasonPhrase: 'No Content', headers: {'Access-Control-Allow-Origin': '*'});
+                return WebResourceResponse(
+                  data: Uint8List.fromList([]),
+                  statusCode: 204,
+                  reasonPhrase: 'No Content',
+                  headers: {'Access-Control-Allow-Origin': '*'},
+                );
               }
 
-              final isValidStream = RegExp(r'\.m3u8$|\.m3u8\?|master\.m3u8|playlist\.m3u8|index\.m3u8|mp4-proxy|\/v\/.*\.mp4|\/getm3u8\/|\/stream\/|cf-master.*\.txt', caseSensitive: false).hasMatch(reqUrl);
+              final isValidStream = RegExp(
+                r'\.m3u8$|\.m3u8\?|master\.m3u8|playlist\.m3u8|index\.m3u8|mp4-proxy|\/v\/.*\.mp4|\/getm3u8\/|\/stream\/|cf-master.*\.txt',
+                caseSensitive: false,
+              ).hasMatch(reqUrl);
               if (isValidStream) {
                 _onStreamFound(reqUrl);
-                return WebResourceResponse(data: Uint8List.fromList([]), statusCode: 404, reasonPhrase: 'Blocked', headers: {'Access-Control-Allow-Origin': '*'});
+                return WebResourceResponse(
+                  data: Uint8List.fromList([]),
+                  statusCode: 404,
+                  reasonPhrase: 'Blocked',
+                  headers: {'Access-Control-Allow-Origin': '*'},
+                );
               }
               return null;
             },
             onConsoleMessage: (controller, consoleMessage) async {
               var msg = consoleMessage.message;
-              if (msg.startsWith('"') && msg.endsWith('"')) msg = msg.substring(1, msg.length - 1);
-              
-              if (msg.startsWith('VIDEO_SRC:') || msg.startsWith('VIDEO_CURRENT_SRC:') || msg.startsWith('INTERCEPTED_STREAM:')) {
+              if (msg.startsWith('"') && msg.endsWith('"'))
+                msg = msg.substring(1, msg.length - 1);
+
+              if (msg.startsWith('VIDEO_SRC:') ||
+                  msg.startsWith('VIDEO_CURRENT_SRC:') ||
+                  msg.startsWith('INTERCEPTED_STREAM:')) {
                 final videoUrl = msg.split(':').skip(1).join(':');
                 if (videoUrl.isNotEmpty && !videoUrl.startsWith('blob:')) {
                   _onStreamFound(videoUrl);
@@ -287,7 +376,7 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
               }
             },
           ),
-          
+
           // Virtual Cursor Layer
           Positioned.fill(
             child: Focus(
@@ -304,7 +393,13 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
                         Icons.mouse,
                         color: Colors.amber,
                         size: 30,
-                        shadows: [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1))],
+                        shadows: [
+                          Shadow(
+                            color: Colors.black,
+                            blurRadius: 4,
+                            offset: Offset(1, 1),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -312,14 +407,17 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
               ),
             ),
           ),
-          
+
           // Instruction Overlay (Top Left)
           Positioned(
             top: 20,
             left: 20,
             child: IgnorePointer(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black87,
                   borderRadius: BorderRadius.circular(8),
@@ -330,7 +428,11 @@ class _WebViewExtractorScreenState extends State<WebViewExtractorScreen> {
                   children: [
                     Text(
                       'Xác minh Captcha',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     SizedBox(height: 4),
                     Text(

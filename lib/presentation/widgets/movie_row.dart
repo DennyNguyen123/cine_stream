@@ -82,35 +82,38 @@ class MovieRowState extends State<MovieRow> {
                 padding: const EdgeInsets.symmetric(vertical: 10.0),
                 itemCount: widget.movies.length,
                 itemBuilder: (context, index) {
-                final movie = widget.movies[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: FocusTraversalOrder(
-                    order: NumericFocusOrder(index.toDouble()),
-                    child: Focus(
-                      canRequestFocus: false,
-                      onKeyEvent: (node, event) {
-                        if (widget.isLastRow && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                          widget.onWrapDown?.call();
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: MovieCard(
-                        key: ValueKey('${widget.rowIndex}_${movie.id}'),
-                        focusNode: index == 0 ? _firstItemNode : null,
-                        movie: movie,
-                        autoFocus: widget.autoFocus && index == 0,
-                        onFocused: () {
-                          widget.onMovieFocused?.call(movie, index);
+                  final movie = widget.movies[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: FocusTraversalOrder(
+                      order: NumericFocusOrder(index.toDouble()),
+                      child: Focus(
+                        canRequestFocus: false,
+                        onKeyEvent: (node, event) {
+                          if (widget.isLastRow &&
+                              event is KeyDownEvent &&
+                              event.logicalKey ==
+                                  LogicalKeyboardKey.arrowDown) {
+                            widget.onWrapDown?.call();
+                            return KeyEventResult.handled;
+                          }
+                          return KeyEventResult.ignored;
                         },
-                        onClick: () => widget.onMoviePressed(movie),
+                        child: MovieCard(
+                          key: ValueKey('${widget.rowIndex}_${movie.id}'),
+                          focusNode: index == 0 ? _firstItemNode : null,
+                          movie: movie,
+                          autoFocus: widget.autoFocus && index == 0,
+                          onFocused: () {
+                            widget.onMovieFocused?.call(movie, index);
+                          },
+                          onClick: () => widget.onMoviePressed(movie),
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
             ),
           ),
         ],

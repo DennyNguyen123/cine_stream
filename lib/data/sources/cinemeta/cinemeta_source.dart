@@ -24,7 +24,8 @@ class CinemetaSource implements MovieSource {
   String get sourceName => 'Cinemeta';
 
   @override
-  String get sourceIcon => 'https://www.stremio.com/website/stremio-logo-small.png';
+  String get sourceIcon =>
+      'https://www.stremio.com/website/stremio-logo-small.png';
 
   @override
   Future<List<HomeSection>> getHomeSections() async {
@@ -32,13 +33,17 @@ class CinemetaSource implements MovieSource {
     try {
       final movieRes = await _dio.get('$_baseUrl/catalog/movie/top.json');
       if (movieRes.data['metas'] != null) {
-        final movies = (movieRes.data['metas'] as List).map((m) => _parseMovie(m, isTv: false)).toList();
+        final movies = (movieRes.data['metas'] as List)
+            .map((m) => _parseMovie(m, isTv: false))
+            .toList();
         sections.add(HomeSection(title: 'Top Movies', movies: movies));
       }
 
       final seriesRes = await _dio.get('$_baseUrl/catalog/series/top.json');
       if (seriesRes.data['metas'] != null) {
-        final series = (seriesRes.data['metas'] as List).map((m) => _parseMovie(m, isTv: true)).toList();
+        final series = (seriesRes.data['metas'] as List)
+            .map((m) => _parseMovie(m, isTv: true))
+            .toList();
         sections.add(HomeSection(title: 'Top Series', movies: series));
       }
     } catch (e) {
@@ -52,15 +57,27 @@ class CinemetaSource implements MovieSource {
     final results = <Movie>[];
     try {
       final encodedQuery = Uri.encodeComponent(query);
-      
-      final movieRes = await _dio.get('$_baseUrl/catalog/movie/top/search=$encodedQuery.json');
+
+      final movieRes = await _dio.get(
+        '$_baseUrl/catalog/movie/top/search=$encodedQuery.json',
+      );
       if (movieRes.data['metas'] != null) {
-        results.addAll((movieRes.data['metas'] as List).map((m) => _parseMovie(m, isTv: false)));
+        results.addAll(
+          (movieRes.data['metas'] as List).map(
+            (m) => _parseMovie(m, isTv: false),
+          ),
+        );
       }
 
-      final seriesRes = await _dio.get('$_baseUrl/catalog/series/top/search=$encodedQuery.json');
+      final seriesRes = await _dio.get(
+        '$_baseUrl/catalog/series/top/search=$encodedQuery.json',
+      );
       if (seriesRes.data['metas'] != null) {
-        results.addAll((seriesRes.data['metas'] as List).map((m) => _parseMovie(m, isTv: true)));
+        results.addAll(
+          (seriesRes.data['metas'] as List).map(
+            (m) => _parseMovie(m, isTv: true),
+          ),
+        );
       }
     } catch (e) {
       print('Cinemeta searchMovies Error: $e');
@@ -69,30 +86,40 @@ class CinemetaSource implements MovieSource {
   }
 
   @override
-  Future<List<Movie>> advancedSearch(Map<String, dynamic> filters, {int page = 1, String query = ''}) async {
+  Future<List<Movie>> advancedSearch(
+    Map<String, dynamic> filters, {
+    int page = 1,
+    String query = '',
+  }) async {
     if (query.isNotEmpty) {
       return searchMovies(query);
     }
-    
+
     // When query is empty, return popular/top movies like KissKH does
     final results = <Movie>[];
     try {
       final type = filters['type'] ?? 'movie';
       final genre = filters['genre'] ?? '';
-      
+
       final skip = (page - 1) * 20; // Assuming 20 items per page
-      
+
       List<String> extraParams = [];
       if (genre.isNotEmpty) extraParams.add('genre=$genre');
       if (skip > 0) extraParams.add('skip=$skip');
-      
-      final paramsString = extraParams.isNotEmpty ? '/${extraParams.join('&')}' : '';
-      
+
+      final paramsString = extraParams.isNotEmpty
+          ? '/${extraParams.join('&')}'
+          : '';
+
       final url = '$_baseUrl/catalog/$type/top$paramsString.json';
-          
+
       final res = await _dio.get(url);
       if (res.data['metas'] != null) {
-        results.addAll((res.data['metas'] as List).map((m) => _parseMovie(m, isTv: type == 'series')));
+        results.addAll(
+          (res.data['metas'] as List).map(
+            (m) => _parseMovie(m, isTv: type == 'series'),
+          ),
+        );
       }
     } catch (e) {
       print('Cinemeta advancedSearch empty Error: $e');
@@ -138,7 +165,7 @@ class CinemetaSource implements MovieSource {
             FilterOption(value: 'War', label: 'War'),
             FilterOption(value: 'Western', label: 'Western'),
           ],
-        )
+        ),
       ],
     );
   }
@@ -162,20 +189,24 @@ class CinemetaSource implements MovieSource {
         for (var v in meta['videos']) {
           final season = v['season'];
           final episode = v['episode'];
-          episodes.add(Episode(
-            id: 'tv/$imdbId/$season/$episode',
-            number: double.parse(episode.toString()),
-            season: int.parse(season.toString()),
-            title: v['title'] ?? 'S${season}E$episode',
-          ));
+          episodes.add(
+            Episode(
+              id: 'tv/$imdbId/$season/$episode',
+              number: double.parse(episode.toString()),
+              season: int.parse(season.toString()),
+              title: v['title'] ?? 'S${season}E$episode',
+            ),
+          );
         }
       } else if (!isTv) {
         // Add a single episode for movies so the play button works
-        episodes.add(Episode(
-          id: 'movie/$imdbId',
-          number: 1,
-          title: meta['name'] ?? 'Movie',
-        ));
+        episodes.add(
+          Episode(
+            id: 'movie/$imdbId',
+            number: 1,
+            title: meta['name'] ?? 'Movie',
+          ),
+        );
       }
 
       episodes.sort((a, b) {
@@ -194,7 +225,7 @@ class CinemetaSource implements MovieSource {
         servers: [
           VideoServer(id: 'vnest', name: 'Vidnest'),
           VideoServer(id: 'vpls', name: 'Vidplay'),
-          VideoServer(id: 'vidsrcme', name: 'Vidsrcme')
+          VideoServer(id: 'vidsrcme', name: 'Vidsrcme'),
         ],
       );
     } catch (e) {
@@ -204,10 +235,12 @@ class CinemetaSource implements MovieSource {
   }
 
   static String? extractTmdbId(String html) {
-    var regex = RegExp(r'https://sub\.vdrk\.site/(?:v2/)?(?:movie|tv)/([^/"]+)');
+    var regex = RegExp(
+      r'https://sub\.vdrk\.site/(?:v2/)?(?:movie|tv)/([^/"]+)',
+    );
     var match = regex.firstMatch(html);
     if (match != null) return match.group(1);
-    
+
     // Fallback: extract from iframe params
     regex = RegExp(r'tmdb=(\d+)');
     match = regex.firstMatch(html);
@@ -215,16 +248,26 @@ class CinemetaSource implements MovieSource {
   }
 
   @override
-  Future<StreamInfo?> getStreamInfo(String movieId, String episodeId, {String? serverId}) async {
+  Future<StreamInfo?> getStreamInfo(
+    String movieId,
+    String episodeId, {
+    String? serverId,
+  }) async {
     try {
-      final cached = StreamInfoCache.getStreamInfo(movieId, episodeId, serverId);
+      final cached = StreamInfoCache.getStreamInfo(
+        movieId,
+        episodeId,
+        serverId,
+      );
       if (cached != null) {
         final videoUrl = cached.videoUrl.toLowerCase();
         if (videoUrl.contains('tiktoks.animanga.fun') ||
             videoUrl.contains('animanga.fun') ||
             videoUrl.contains('tik.1x2.space') ||
             videoUrl.contains('nightspeedster.app')) {
-          print('[Cinemeta] Cached stream info contains blocked domain, clearing cache.');
+          print(
+            '[Cinemeta] Cached stream info contains blocked domain, clearing cache.',
+          );
           await StreamInfoCache.clearCache(movieId, episodeId, serverId);
         } else {
           return cached;
@@ -249,29 +292,31 @@ class CinemetaSource implements MovieSource {
       try {
         final response = await _dio.get(embedUrl);
         final html = response.data.toString();
-        
+
         tmdbId = extractTmdbId(html);
 
         final iframeSrcRegex = RegExp(r'data-src="(https?://[^"]+)"');
         final matches = iframeSrcRegex.allMatches(html).toList();
-        
+
         final preferredDomains = ['vnest', 'vpls'];
-        
+
         for (final match in matches) {
           final src = match.group(1)!.replaceAll('&amp;', '&');
           String serverName = 'Unknown';
-          
+
           if (src.contains('vnest')) {
             serverName = 'Vidnest';
-          } else if (src.contains('vpls')) serverName = 'Vidplay';
-          else continue; // Bỏ qua các server không thuộc Vidnest hoặc Vidplay
-          
+          } else if (src.contains('vpls'))
+            serverName = 'Vidplay';
+          else
+            continue; // Bỏ qua các server không thuộc Vidnest hoặc Vidplay
+
           // Only add if not already in list to avoid duplicates
           if (!servers.any((s) => s.name == serverName || s.id == src)) {
             servers.add(VideoServer(id: src, name: serverName));
           }
         }
-        
+
         servers.add(VideoServer(id: 'vidsrcme', name: 'Vidsrcme'));
 
         // Determine target server URL
@@ -279,13 +324,15 @@ class CinemetaSource implements MovieSource {
           if (serverId == 'vidsrcme') {
             targetServerUrl = 'vidsrcme';
           } else {
-            final found = servers.where((s) => s.id.contains(serverId)).toList();
+            final found = servers
+                .where((s) => s.id.contains(serverId))
+                .toList();
             if (found.isNotEmpty) {
               targetServerUrl = found.first.id;
             }
           }
-        } 
-        
+        }
+
         if (targetServerUrl == null) {
           // Select preferred
           for (final domain in preferredDomains) {
@@ -315,24 +362,39 @@ class CinemetaSource implements MovieSource {
       }
 
       // Fetch subtitles first
-      final subtitles = tmdbId != null 
-          ? await VdrkSubtitleExtractor.fetchSubtitles(tmdbId, isTv: isTv, s: s, e: e) 
+      final subtitles = tmdbId != null
+          ? await VdrkSubtitleExtractor.fetchSubtitles(
+              tmdbId,
+              isTv: isTv,
+              s: s,
+              e: e,
+            )
           : <SubtitleTrack>[];
 
       StreamInfo? streamInfo;
-      
+
       if (targetServerUrl == 'vidsrcme') {
         String vidsrcUrl;
         if (isTv) {
-          vidsrcUrl = 'https://vidsrcme.ru/embed/tv?imdb=$imdbId&season=${episodeId.split('/')[2]}&episode=${episodeId.split('/')[3]}&autoplay=1';
+          vidsrcUrl =
+              'https://vidsrcme.ru/embed/tv?imdb=$imdbId&season=${episodeId.split('/')[2]}&episode=${episodeId.split('/')[3]}&autoplay=1';
         } else {
           vidsrcUrl = 'https://vidsrcme.ru/embed/movie?imdb=$imdbId&autoplay=1';
         }
-        streamInfo = await VidsrcmeExtractor.extractStream(vidsrcUrl, subtitles);
+        streamInfo = await VidsrcmeExtractor.extractStream(
+          vidsrcUrl,
+          subtitles,
+        );
       } else if (targetServerUrl.contains('vnest')) {
-        streamInfo = await VidnestExtractor.extractStream(targetServerUrl, subtitles);
+        streamInfo = await VidnestExtractor.extractStream(
+          targetServerUrl,
+          subtitles,
+        );
       } else if (targetServerUrl.contains('vpls')) {
-        streamInfo = await VidplayExtractor.extractStream(targetServerUrl, subtitles);
+        streamInfo = await VidplayExtractor.extractStream(
+          targetServerUrl,
+          subtitles,
+        );
       }
 
       String? resolvedServerId = serverId;
@@ -354,7 +416,12 @@ class CinemetaSource implements MovieSource {
           currentServerId: resolvedServerId,
           headers: streamInfo.headers,
         );
-        await StreamInfoCache.saveStreamInfo(movieId, episodeId, serverId, result);
+        await StreamInfoCache.saveStreamInfo(
+          movieId,
+          episodeId,
+          serverId,
+          result,
+        );
         return result;
       }
 
@@ -371,7 +438,8 @@ class CinemetaSource implements MovieSource {
   Movie _parseMovie(Map<String, dynamic> data, {required bool isTv}) {
     final type = isTv ? 'series' : 'movie';
     String? yearStr;
-    final releaseInfo = data['releaseInfo']?.toString() ?? data['year']?.toString();
+    final releaseInfo =
+        data['releaseInfo']?.toString() ?? data['year']?.toString();
     if (releaseInfo != null) {
       if (releaseInfo.length >= 4) {
         yearStr = releaseInfo.substring(0, 4);

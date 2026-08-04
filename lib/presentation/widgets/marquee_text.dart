@@ -56,16 +56,18 @@ class _MarqueeTextState extends State<MarqueeText> {
       await Future.delayed(const Duration(seconds: 1)); // Wait before scrolling
       if (!mounted || !_isScrolling) return;
 
-      final duration = Duration(milliseconds: (maxScrollExtent * 30).toInt()); // Adjust speed here
-      
+      final duration = Duration(
+        milliseconds: (maxScrollExtent * 30).toInt(),
+      ); // Adjust speed here
+
       await _scrollController.animateTo(
         maxScrollExtent,
         duration: duration,
         curve: Curves.linear,
       );
-      
+
       if (!mounted || !_isScrolling) return;
-      
+
       await Future.delayed(const Duration(seconds: 1)); // Wait at the end
       if (!mounted || !_isScrolling) return;
 
@@ -87,11 +89,7 @@ class _MarqueeTextState extends State<MarqueeText> {
       controller: _scrollController,
       scrollDirection: Axis.horizontal,
       physics: const NeverScrollableScrollPhysics(),
-      child: Text(
-        widget.text,
-        style: widget.style,
-        maxLines: 1,
-      ),
+      child: Text(widget.text, style: widget.style, maxLines: 1),
     );
   }
 }

@@ -12,10 +12,10 @@ class TtsServiceFacade implements TtsService {
     required TtsService nativeTts,
     required TtsService openAiTts,
     required TtsService edgeTts,
-  })  : _prefs = prefs,
-        _nativeTts = nativeTts,
-        _openAiTts = openAiTts,
-        _edgeTts = edgeTts;
+  }) : _prefs = prefs,
+       _nativeTts = nativeTts,
+       _openAiTts = openAiTts,
+       _edgeTts = edgeTts;
 
   TtsService get _activeService {
     final engine = _prefs.getString('tts_engine') ?? 'native';

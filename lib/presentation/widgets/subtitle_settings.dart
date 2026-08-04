@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 
-
 class SubtitleSettingsDialog extends StatefulWidget {
   const SubtitleSettingsDialog({super.key});
 
@@ -47,5 +46,4 @@ class _SubtitleSettingsDialogState extends State<SubtitleSettingsDialog> {
       ),
     );
   }
-
 }
